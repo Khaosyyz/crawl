@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>AI 行业资讯</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="shortcut icon" href="#" />
+    <!-- 添加GSAP库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>AI 行业最新资讯</h1>
+        <div class="header-info">
+            <p>AI 聚合平台：<a href="https://liaobots.work" target="_blank">Liaobots.work</a> ；AI 官方镜像站：<a href="https://liaox.ai" target="_blank">Liaox.ai</a></p>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="搜索关键词...">
+            <button id="clear-search">清除</button>
+            <button id="refresh-button">刷新数据</button>
+        </div>
+    </header>
+
+    <!-- 添加标签页导航 -->
+    <div class="tabs-container">
+        <div class="tabs">
+            <button class="tab-button" data-source="x.com">X - 高丰富度资讯来源</button>
+            <button class="tab-button" data-source="crunchbase.com">Crunchbase - 发觉市场投资良机</button>
+            <!-- 未来可以添加更多标签 -->
+            <!-- <button class="tab-button" data-source="future_source">未来来源</button> -->
+        </div>
+    </div>
+
+    <main id="news-container">
+        <div class="loading">正在加载资讯...</div>
+    </main>
+
+    <!-- 添加分页控件 -->
+    <div class="pagination-container">
+        <div class="pagination" id="pagination">
+            <!-- 分页按钮将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <!-- 添加回到顶部和底部的按钮 -->
+    <div class="scroll-buttons">
+        <button id="scrollToTopBtn" title="回到顶部">↑</button>
+        <button id="scrollToBottomBtn" title="去到底部">↓</button>
+    </div>
+
+    <footer>
+        <p>数据来源于 X 及其他平台，由AI自动清洗整理</p>
+        <p>&copy; 2025 AI聚合平台：Liaobots.work</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
