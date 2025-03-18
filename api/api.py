@@ -3,6 +3,7 @@ import json
 import os
 import time
 import logging
+import re
 
 
 # 设置日志记录 - 只记录警告和错误
@@ -29,11 +30,6 @@ app.logger.disabled = True
 log = logging.getLogger('werkzeug')
 log.disabled = True
 
-# 缓存数据和更新时间
-data_cache = None
-last_update_time = 0
-CACHE_DURATION = 35  # 缓存有效期（秒）
-
 
 def load_data_from_jsonl():
     """从JSONL文件加载数据"""
@@ -47,13 +43,22 @@ def load_data_from_jsonl():
             for line in f:
                 try:
                     item = json.loads(line.strip())
+                    
+                    # 处理内容中的换行符，将\n和实际的换行符替换为<br/>标签
+                    if 'content' in item and item['content']:
+                        # 同时处理转义的换行符和实际的换行符
+                        item['content'] = item['content'].replace('\\n', '<br/>').replace('\n', '<br/>')
+                        
+                        # 确保连续的<br/>被处理为单个（使用正则表达式更高效）
+                        item['content'] = re.sub(r'(<br/>)+', '<br/>', item['content'])
+                    
                     data.append(item)
                 except json.JSONDecodeError:
                     logger.error(f"无法解析JSONL行: {line}")
                     continue
 
-        # 按日期时间倒序排序（最新的在前面）
-        data.sort(key=lambda x: x.get('date_time', ''), reverse=True)
+        # 按日期时间倒序排序（优先使用date_time，如果不存在则使用published_date）
+        data.sort(key=lambda x: x.get('date_time', x.get('published_date', '')), reverse=True)
         return data
     except Exception as e:
         logger.error(f"加载数据出错: {e}")
@@ -61,17 +66,7 @@ def load_data_from_jsonl():
 
 
 def get_data():
-    """获取数据，使用缓存优化性能"""
-    global data_cache, last_update_time
-
-    # 修改: 始终从文件读取最新数据，不使用缓存
-    # current_time = time.time()
-    # if data_cache is None or (current_time - last_update_time) > CACHE_DURATION:
-    #     data_cache = load_data_from_jsonl()
-    #     last_update_time = current_time
-    # return data_cache
-    
-    # 直接返回最新数据
+    """获取数据，直接从文件读取最新数据"""
     return load_data_from_jsonl()
 
 
@@ -193,8 +188,6 @@ def get_sources():
 def main():
     """主函数"""
     print("API服务已启动，正在监听 http://0.0.0.0:8080")
-    # 预加载数据到缓存
-    get_data()
     # 启动Flask应用
     app.run(host='0.0.0.0', port=8080, debug=False)
 

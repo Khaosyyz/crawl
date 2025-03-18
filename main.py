@@ -265,9 +265,69 @@ def start_cleaner_service():
             log.write(f"{'-'*50}\n\n")
             log.flush()
             
-            # 启动进程
+            # 创建定时运行清洗服务的脚本内容
+            loop_script = '''
+import os
+import sys
+import time
+import subprocess
+import logging
+
+# 设置日志记录
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join("''' + LOG_DIR + '''", "cleaner_loop.log")),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("cleaner_loop")
+
+# 清洗脚本路径
+CLEANER_SCRIPT = "''' + cleaner_script + '''"
+
+def main():
+    """主函数，循环运行清洗服务"""
+    logger.info("清洗服务循环启动")
+    
+    try:
+        while True:
+            logger.info("启动清洗服务...")
+            
+            # 运行清洗服务
+            process = subprocess.run(
+                [sys.executable, CLEANER_SCRIPT],
+                capture_output=True,
+                text=True
+            )
+            
+            # 记录执行结果
+            if process.returncode == 0:
+                logger.info("清洗服务执行完成，等待下一次执行")
+            else:
+                logger.error(f"清洗服务执行失败，返回码: {process.returncode}")
+                logger.error(f"错误输出: {process.stderr}")
+            
+            # 等待一段时间再次执行
+            wait_time = 60  # 1分钟
+            logger.info(f"等待 {wait_time} 秒后再次执行清洗服务...")
+            time.sleep(wait_time)
+            
+    except KeyboardInterrupt:
+        logger.info("收到中断信号，清洗服务循环退出")
+    except Exception as e:
+        logger.error(f"清洗服务循环发生错误: {e}")
+    
+    logger.info("清洗服务循环结束")
+
+if __name__ == "__main__":
+    main()
+'''
+            
+            # 启动循环脚本
             process = subprocess.Popen(
-                [VENV_PYTHON, cleaner_script],
+                [VENV_PYTHON, "-c", loop_script],
                 stdout=log,
                 stderr=log
             )
@@ -303,7 +363,6 @@ def start_cleaner_service():
             logger.error(error_msg)
             print(f"错误: {error_msg}")
             return False
-    
 
 
 def run_crawler(crawler_module=None):

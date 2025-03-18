@@ -796,6 +796,13 @@ class XCrawler:
             return False
             
         try:
+            # 确保浏览器处于活跃状态
+            if not self._is_browser_alive():
+                print("浏览器未处于活跃状态，重新创建浏览器...")
+                if not self._recreate_browser():
+                    print("重新创建浏览器失败，无法加载cookies")
+                    return False
+                    
             # 先访问Twitter域名，以便能添加cookies
             self.driver.get("https://twitter.com")
             time.sleep(1)
@@ -829,6 +836,13 @@ class XCrawler:
             return True
         except Exception as e:
             print(f"加载cookies出错: {e}")
+            # 如果加载失败且是由于会话ID无效，尝试重新创建浏览器
+            if "invalid session id" in str(e).lower():
+                print("检测到无效会话ID错误，尝试重新创建浏览器...")
+                if self._recreate_browser():
+                    print("浏览器重新创建成功，尝试重新加载cookies")
+                    # 递归调用但要防止无限递归
+                    return self._load_cookies()
             return False
 
     def _refresh_cookie(self):
@@ -894,6 +908,12 @@ class XCrawler:
             return False
         except Exception as e:
             print(f"检查登录状态时出错: {e}")
+            # 如果是会话无效错误，尝试重新创建浏览器
+            if "invalid session id" in str(e).lower():
+                print("检测到无效会话ID错误，尝试重新创建浏览器...")
+                if self._recreate_browser():
+                    print("浏览器重新创建成功，重新检查登录状态")
+                    return self.check_login_status()
             return False
 
     def handle_2fa(self):
@@ -1169,7 +1189,7 @@ class XCrawler:
         # 访问搜索页面
         try:
             print("开始爬取推文...")
-            url = "https://x.com/search?q=AI&src=typed_query"
+            url = "https://x.com/search?q=AI&src=typed_query&f=live"
             print(f"访问搜索页面: {url}")
             self.driver.get(url)
             time.sleep(7)  # 增加初始页面加载等待时间
@@ -1379,9 +1399,28 @@ class XCrawler:
         """将帖子格式化为保存格式"""
         formatted_posts = []
         for post in posts:
+            # 处理创建时间 - Twitter的格式通常是 "Wed Oct 10 20:19:24 +0000 2018"
+            created_at = post.get('created_at', '')
+            formatted_date_time = ''
+            
+            # 尝试转换为标准格式 "YYYY-MM-DD HH:MM"
+            if created_at:
+                try:
+                    # 解析Twitter时间格式
+                    created_time = datetime.strptime(created_at, '%a %b %d %H:%M:%S +0000 %Y')
+                    # 转换为北京时间
+                    beijing_time = created_time.replace(tzinfo=pytz.UTC).astimezone(BEIJING_TZ)
+                    # 格式化为标准格式
+                    formatted_date_time = beijing_time.strftime('%Y-%m-%d %H:%M')
+                except Exception as e:
+                    print(f"时间格式转换出错: {e}")
+                    formatted_date_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+            else:
+                formatted_date_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+                
             # 构建格式化的文本，包含所有原始信息
             formatted_text = (f"{post['text']} [作者: {post.get('name', '')} "
-                              f"(@{post['username']}), 时间: {post.get('created_at', '')}, "
+                              f"(@{post['username']}), 时间: {formatted_date_time}, "
                               f"粉丝: {post.get('followers_count', 0)}, 点赞: {post.get('favorite_count', 0)}, "
                               f"转发: {post.get('retweet_count', 0)}]")
             
@@ -1394,6 +1433,7 @@ class XCrawler:
             formatted_posts.append({
                 'text': formatted_text,
                 'raw': post,
+                'date_time': formatted_date_time,  # 添加标准格式的日期时间
                 'crawl_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'source': 'x.com',
                 'source_url': source_url,  # 添加source_url字段，用于前端显示
@@ -1730,12 +1770,27 @@ class XCrawler:
                             tweet_elements = self.driver.find_elements(By.XPATH, '//article[@data-testid="tweet"]//div[@lang]')
                             if not tweet_elements:
                                 print("未找到推文元素，可能是遇到了速率限制")
-                                continue
+                                # 不再调用retry_with_another_account方法，而是直接终止进程
+                                print("检测到可能的速率限制，终止爬虫进程")
+                                return 0
                         except Exception as e:
                             if not self._is_browser_alive():
                                 raise Exception("浏览器已关闭")
                             else:
                                 print(f"获取推文元素时出错: {e}")
+                                # 检查是否是会话无效错误
+                                if "invalid session id" in str(e).lower():
+                                    print("检测到无效会话ID错误，尝试重新创建浏览器...")
+                                    if self._recreate_browser():
+                                        print("浏览器重新创建成功，继续处理博主")
+                                        continue
+                                    else:
+                                        print("浏览器重新创建失败，终止爬虫进程")
+                                        return 0
+                                # 检查错误信息是否表明速率限制
+                                elif "rate limit" in str(e).lower() or "429" in str(e) or "too many requests" in str(e).lower():
+                                    print("检测到速率限制错误，终止爬虫进程")
+                                    return 0
                                 continue
 
                         # 提取推文文本

@@ -513,18 +513,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // 按日期分组新闻
     function groupNewsByDate(newsData) {
         const grouped = {};
-
+        
         newsData.forEach(news => {
-            // 从日期时间字符串中提取日期部分 (YYYY-MM-DD)
-            const dateStr = news.date_time ? news.date_time.split(' ')[0] : '未知日期';
-
+            // 优先使用 date_time 字段，如果不存在则尝试使用 published_date 或 published_at 字段
+            let dateStr = '未知日期';
+            
+            if (news.date_time) {
+                // 处理 date_time 格式（可能包含时间部分）
+                dateStr = news.date_time.split(' ')[0];
+            } else if (news.published_date) {
+                // 直接使用 published_date（通常只有日期部分）
+                dateStr = news.published_date;
+            } else if (news.published_at) {
+                // 使用 published_at 字段（X.com数据使用这个字段）
+                dateStr = news.published_at.split(' ')[0];
+            }
+            
             if (!grouped[dateStr]) {
                 grouped[dateStr] = [];
             }
-
+            
             grouped[dateStr].push(news);
         });
-
+        
         return grouped;
     }
 
@@ -565,7 +576,13 @@ document.addEventListener('DOMContentLoaded', function() {
         newsCard.className = 'news-card';
 
         // 获取时间部分 (HH:MM)
-        const timeStr = news.date_time ? news.date_time.split(' ')[1] || '' : '';
+        let timeStr = '';
+        if (news.date_time) {
+            timeStr = news.date_time.split(' ')[1] || '';
+        } else if (news.published_at && news.source === 'x.com') {
+            // 对于X.com数据，从published_at获取时间部分
+            timeStr = news.published_at.split(' ')[1] || '';
+        }
 
         // 格式化内容，保留链接
         const formattedContent = formatContent(news.content);
@@ -684,9 +701,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="news-footer">
                     <div class="news-author">${escapeHtml(news.author)}</div>
                     <div class="news-stats">
-                        <span>粉丝: ${formatNumber(news.stats?.followers_count || 0)}</span>
-                        <span>点赞: ${formatNumber(news.stats?.favorite_count || 0)}</span>
-                        <span>转发: ${formatNumber(news.stats?.retweet_count || 0)}</span>
+                        <span>粉丝: ${formatNumber(news.meta?.followers || news.stats?.followers_count || 0)}</span>
+                        <span>点赞: ${formatNumber(news.meta?.likes || news.stats?.favorite_count || 0)}</span>
+                        <span>转发: ${formatNumber(news.meta?.retweets || news.stats?.retweet_count || 0)}</span>
                     </div>
                     ${sourceUrl ? `<div class="news-source-link">来源：<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${formatUrlForDisplay(sourceUrl)}</a></div>` : ''}
                 </div>
@@ -761,9 +778,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!content) return '';
 
         // 为Crunchbase内容特殊处理
-        if (currentSource === 'crunchbase.com') {
+        if (currentSource === 'crunchbase.com' && !content.includes('<br/>')) {
+            // 只有当内容中没有已处理的<br/>标签时才执行额外格式化
             // 检测Crunchbase特有的内容格式，确保有适当的换行
-            // 需要在标题后添加换行，在中间添加换行以防止过长段落
             content = content.replace(/([.:!?]) ([A-Z])/g, '$1\n$2');
         }
 

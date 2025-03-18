@@ -196,12 +196,24 @@ class CrunchbaseCrawler:
             logger.error(f"保存页面源码出错: {e}")
     
     def check_url_table(self, current_urls):
-        """检查URL表，返回需要爬取的新URL"""
+        """检查URL表，确定哪些URL需要爬取"""
         # 读取现有URL表
         if os.path.exists(self.url_table_path):
             try:
                 with open(self.url_table_path, 'r', encoding='utf-8') as f:
                     url_table = json.load(f)
+                    # 确保 url_table 是字典格式
+                    if isinstance(url_table, list):
+                        logger.warning("URL表是列表格式，转换为字典格式")
+                        url_table = {"last_check": "", "urls": {}}
+                    elif not isinstance(url_table, dict):
+                        logger.warning("URL表格式不是字典，创建新表")
+                        url_table = {"last_check": "", "urls": {}}
+                    # 确保 url_table 包含所需的键
+                    if "last_check" not in url_table:
+                        url_table["last_check"] = ""
+                    if "urls" not in url_table:
+                        url_table["urls"] = {}
             except json.JSONDecodeError:
                 logger.warning("URL表格式错误，将创建新表")
                 url_table = {"last_check": "", "urls": {}}
@@ -252,24 +264,26 @@ class CrunchbaseCrawler:
             logger.info(f"爬取文章: {url}")
             self.driver.get(url)
             
-            # 等待文章内容加载，增加等待时间
+            # 等待文章内容加载，增加更多等待时间
             try:
-                WebDriverWait(self.driver, 20).until(
+                WebDriverWait(self.driver, 30).until(
                     EC.presence_of_element_located((By.TAG_NAME, "article"))
                 )
-                time.sleep(2)  # 额外等待确保内容完全加载
+                # 额外等待确保所有内容（包括动态内容）完全加载
+                time.sleep(5)
             except TimeoutException:
                 logger.warning(f"等待文章内容加载超时: {url}")
                 self.save_page_source(f"article_timeout_{url.split('/')[-1]}.html")
-                # 尝试继续执行
+                # 继续执行，尝试其他方法获取内容
             
             # 尝试不同的选择器提取标题
             title = ""
-            for selector in ["article h1", "h1", ".article-title", "header h1"]:
+            for selector in ["article h1", "h1.post-title", ".article-title", "header h1", "h1"]:
                 try:
                     title_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    title = title_elem.text
+                    title = title_elem.text.strip()
                     if title:
+                        logger.info(f"从选择器 '{selector}' 找到标题: {title}")
                         break
                 except NoSuchElementException:
                     continue
@@ -279,8 +293,8 @@ class CrunchbaseCrawler:
                 logger.warning(f"未能找到文章标题: {url}")
             
             # 提取发布日期，确保只包含YYYY-MM-DD格式
-            published_date = datetime.now().strftime('%Y-%m-%d')  # 默认使用当前日期，仅年月日
-            for selector in ["time", ".post-date", ".article-date", "article .date"]:
+            published_date = datetime.now().strftime('%Y-%m-%d')
+            for selector in ["time", ".post-date", ".article-date", "article .date", "article time"]:
                 try:
                     date_element = self.driver.find_element(By.CSS_SELECTOR, selector)
                     date_text = date_element.get_attribute("datetime") or date_element.text
@@ -289,25 +303,138 @@ class CrunchbaseCrawler:
                         date_match = re.search(r'(\d{4}-\d{2}-\d{2})', date_text)
                         if date_match:
                             published_date = date_match.group(1)
+                            logger.info(f"从选择器 '{selector}' 找到日期: {published_date}")
                         break
                 except NoSuchElementException:
                     continue
             
-            # 提取文章内容
-            content = ""
-            for selector in ["article p", ".article-content p", ".post-content p", "main p"]:
+            # 提取文章内容 - 改进内容提取，尝试多种选择器并组合结果
+            content_parts = []
+            
+            # 优先使用文章正文内容容器
+            selectors = [
+                "article .post-content", 
+                ".article-content", 
+                "article .content",
+                ".post-body",
+                "article",
+                "main"
+            ]
+            
+            content_container = None
+            for selector in selectors:
                 try:
-                    content_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    if content_elements:
-                        content = "\n".join([p.text for p in content_elements if p.text.strip()])
+                    content_container = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    if content_container:
+                        logger.info(f"找到内容容器: {selector}")
                         break
-                except:
+                except NoSuchElementException:
                     continue
             
+            if content_container:
+                # 从内容容器中提取所有段落
+                try:
+                    paragraphs = content_container.find_elements(By.TAG_NAME, "p")
+                    for p in paragraphs:
+                        text = p.text.strip()
+                        if text:
+                            content_parts.append(text)
+                    
+                    logger.info(f"从内容容器中提取了 {len(content_parts)} 个段落")
+                except Exception as e:
+                    logger.warning(f"从内容容器提取段落失败: {e}")
+            
+            # 如果内容部分为空，尝试使用最通用的段落选择器
+            if not content_parts:
+                logger.warning(f"未通过内容容器找到段落，尝试直接查找所有p标签")
+                try:
+                    paragraphs = self.driver.find_elements(By.TAG_NAME, "p")
+                    for p in paragraphs:
+                        # 过滤掉很短的段落，比如广告或者页脚文本
+                        text = p.text.strip()
+                        if text and len(text) > 20:  # 只保留长度大于20的段落
+                            content_parts.append(text)
+                    
+                    logger.info(f"从全局段落中提取了 {len(content_parts)} 个段落")
+                except Exception as e:
+                    logger.warning(f"提取全局段落失败: {e}")
+            
+            # 如果仍然没有内容，尝试获取整个页面文本，但排除导航和页脚等区域
+            if not content_parts:
+                logger.warning(f"未能找到文章段落，尝试获取页面主体文本")
+                try:
+                    # 尝试获取main或article标签的文本，排除header和footer
+                    for elem_tag in ["main", "article", "body"]:
+                        try:
+                            main_elem = self.driver.find_element(By.TAG_NAME, elem_tag)
+                            text = main_elem.text
+                            if text and len(text) > 100:  # 确保文本长度合理
+                                # 使用启发式方法分割段落
+                                lines = text.split('\n')
+                                for line in lines:
+                                    line = line.strip()
+                                    if line and len(line) > 30:  # 只保留有意义的长行
+                                        content_parts.append(line)
+                                break
+                        except:
+                            continue
+                except Exception as e:
+                    logger.error(f"获取页面主体文本失败: {e}")
+            
+            # 检查内容是否为空
+            content = "\n".join(content_parts) if content_parts else ""
+            
+            # 如果获取的内容太短，尝试一种备用方法
+            if len(content) < 200:
+                logger.warning(f"获取的内容太短，尝试JavaScript方法提取文本")
+                try:
+                    # 使用JavaScript获取所有可见文本内容
+                    js_content = self.driver.execute_script("""
+                        function getVisibleText() {
+                            // 排除脚本、样式等标签
+                            const skipTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'META', 'LINK']);
+                            // 结果数组
+                            const textBlocks = [];
+                            
+                            // 递归遍历DOM树
+                            function extract(node) {
+                                if (node.nodeType === Node.TEXT_NODE) {
+                                    const text = node.textContent.trim();
+                                    if (text && text.length > 20) {
+                                        textBlocks.push(text);
+                                    }
+                                } else if (node.nodeType === Node.ELEMENT_NODE && !skipTags.has(node.tagName)) {
+                                    // 检查元素是否可见
+                                    const style = window.getComputedStyle(node);
+                                    if (style.display !== 'none' && style.visibility !== 'hidden') {
+                                        // 递归处理所有子节点
+                                        for (const child of node.childNodes) {
+                                            extract(child);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 获取主要内容区域
+                            const mainContent = document.querySelector('article') || 
+                                               document.querySelector('main') || 
+                                               document.body;
+                            
+                            extract(mainContent);
+                            return textBlocks.join("\\n");
+                        }
+                        return getVisibleText();
+                    """)
+                    
+                    if js_content and len(js_content) > 200:
+                        content = js_content
+                        logger.info("成功使用JavaScript方法提取到内容")
+                except Exception as e:
+                    logger.error(f"JavaScript提取内容失败: {e}")
+            
             if not content:
-                logger.warning(f"未能找到文章内容: {url}")
-                # 如果没有找到内容，尝试获取全部页面文本
-                content = self.driver.find_element(By.TAG_NAME, "body").text
+                logger.warning(f"所有方法均未能找到文章内容: {url}")
+                content = f"无法提取文章内容，请访问原始链接查看: {url}"
             
             # 提取作者信息
             author = "Crunchbase Staff"
@@ -315,7 +442,8 @@ class CrunchbaseCrawler:
                 try:
                     author_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
                     if author_elem.text:
-                        author = author_elem.text
+                        author = author_elem.text.strip()
+                        logger.info(f"找到作者: {author}")
                         break
                 except NoSuchElementException:
                     continue
@@ -327,6 +455,15 @@ class CrunchbaseCrawler:
             # 提取公司/产品信息
             company_product = self.extract_company_product(content)
             
+            # 记录内容长度信息
+            content_length = len(content)
+            logger.info(f"提取到的内容长度: {content_length} 字符")
+            
+            # 记录几句内容示例
+            if content_length > 0:
+                content_sample = content[:200] + "..." if content_length > 200 else content
+                logger.info(f"内容示例: {content_sample}")
+            
             article = {
                 "title": title,
                 "content": content,
@@ -336,7 +473,8 @@ class CrunchbaseCrawler:
                 "author": author,
                 "investment_amount": investment_amount,
                 "investors": investors,
-                "company_product": company_product
+                "company_product": company_product,
+                "content_length": content_length  # 添加内容长度字段，便于调试
             }
             
             logger.info(f"成功爬取文章: {title}")
@@ -512,89 +650,21 @@ class CrunchbaseCrawler:
             logger.error(f"保存到临时存储时出错: {e}")
     
     def process_and_save_in_batches(self, posts, batch_size=10):
-        """将大量文章数据分批处理并保存到data.jsonl，避免AI处理超出上下文限制"""
+        """将大量文章数据批量处理并只保存到临时存储，不再直接写入data.jsonl"""
         if not posts:
             logger.warning("没有数据需要处理")
             return 0
             
-        logger.info(f"开始分批处理 {len(posts)} 篇文章，每批 {batch_size} 篇")
+        logger.info(f"开始处理 {len(posts)} 篇文章，每批 {batch_size} 篇")
         
         # 格式化所有帖子
         formatted_posts = self.format_posts_for_saving(posts)
         
-        # 分批处理
-        total_batches = (len(formatted_posts) + batch_size - 1) // batch_size
-        total_processed = 0
+        # 保存到临时存储
+        logger.info(f"批量处理完成，将所有 {len(formatted_posts)} 篇文章保存到临时存储")
+        self._save_to_temp_storage([post['raw'] for post in formatted_posts])
         
-        jsonl_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            'data',
-            'data.jsonl'
-        )
-        
-        for batch_num in range(total_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min((batch_num + 1) * batch_size, len(formatted_posts))
-            batch = formatted_posts[start_idx:end_idx]
-            
-            logger.info(f"处理第 {batch_num+1}/{total_batches} 批，包含 {len(batch)} 篇文章")
-            
-            # 处理批次
-            for item in batch:
-                # 生成简单摘要作为文章概览
-                title = item['raw'].get('title', '')
-                url = item['raw'].get('url', '')
-                source = item['raw'].get('source', 'crunchbase.com')
-                
-                # 获取日期，确保是YYYY-MM-DD格式
-                published_date = item['raw'].get('published_date', datetime.now().strftime('%Y-%m-%d'))
-                # 确保日期格式正确，只保留YYYY-MM-DD部分
-                if published_date:
-                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', published_date)
-                    if date_match:
-                        published_date = date_match.group(1)
-                
-                # 从内容中提取一个简短摘要
-                content = item['raw'].get('content', '')
-                summary = content[:200] + '...' if len(content) > 200 else content
-                
-                # 确保获取所有必要字段
-                investment_amount = item['raw'].get('investment_amount', 'N/A')
-                investors = item['raw'].get('investors', [])
-                company_product = item['raw'].get('company_product', '未知')
-                
-                # 创建处理后的条目
-                processed_item = {
-                    "source": source,
-                    "title": title,
-                    "url": url, 
-                    "source_url": url,  # 添加source_url字段，用于前端显示
-                    "content": summary,
-                    "crawl_time": item['crawl_time'],
-                    "date_time": published_date,  # 保存为YYYY-MM-DD格式，不包含小时和分钟
-                    "processed": True,
-                    "investment_amount": investment_amount,
-                    "investors": investors,
-                    "company_product": company_product,
-                    "formatted_for_readability": True  # 标记已经格式化
-                }
-                
-                # 将处理后的数据保存到data.jsonl
-                with open(jsonl_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps(processed_item, ensure_ascii=False) + '\n')
-                
-                total_processed += 1
-            
-            logger.info(f"完成第 {batch_num+1} 批处理，已保存到 {jsonl_path}")
-            # 批次间短暂休息
-            time.sleep(1)
-        
-        logger.info(f"分批处理完成，共处理 {total_processed} 篇文章")
-        
-        # 同时还将原始数据保存到临时存储，以便后续处理
-        self._save_to_temp_storage(posts)
-        
-        return total_processed
+        return len(formatted_posts)
     
     def close(self):
         """关闭浏览器并清理资源"""
