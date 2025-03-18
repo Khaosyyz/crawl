@@ -240,8 +240,7 @@ class XCrawler:
         options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
         
         # 使用本地已安装的ChromeDriver
-        chromedriver_path = '/Users/syyz/.wdm/drivers/chromedriver/mac64/134.0.6998.88/chromedriver-mac-arm64/chromedriver'
-        service = Service(executable_path=chromedriver_path)
+        service = Service()
         
         # 清理可能残留的Chrome进程
         self._clean_chrome_processes()
@@ -250,8 +249,16 @@ class XCrawler:
         for attempt in range(3):
             try:
                 print(f"尝试创建Chrome实例，第{attempt+1}次...")
-                driver = webdriver.Chrome(service=service, options=options)
-                print("Chrome实例创建成功")
+                try:
+                    # 首先尝试使用指定的ChromeDriver路径
+                    driver = webdriver.Chrome(service=service, options=options)
+                    print("Chrome实例创建成功")
+                except Exception as e:
+                    # 如果失败，尝试使用系统默认的ChromeDriver
+                    print(f"使用指定ChromeDriver失败: {e}")
+                    print("尝试使用系统默认ChromeDriver...")
+                    driver = webdriver.Chrome(options=options)
+                    print("Chrome实例创建成功 (使用系统默认ChromeDriver)")
                 
                 try:
                     # 高级CDP命令 - 必须在浏览器启动后执行
