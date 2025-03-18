@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const DATES_PER_PAGE = 2;
     // 每个日期默认显示的新闻数量
     const DEFAULT_NEWS_PER_DATE = 9;
+    // Crunchbase 显示更多相关变量
+    let crunchbaseDisplayCount = 3;
+    let crunchbaseNews = [];
 
     // 设置X标签为默认选中
     if (tabButtons.length > 0) {
@@ -114,6 +117,11 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 重置为第一页
             currentPage = 1;
+            
+            // 如果是 Crunchbase，重置显示数量
+            if (currentSource === 'crunchbase.com') {
+                crunchbaseDisplayCount = 3;
+            }
             
             // 如果有搜索内容，重新执行搜索
             if (currentSearchQuery) {
@@ -276,25 +284,49 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 处理数据并显示新闻（包括分页）
     function processAndDisplayNews(newsData, isSearchResult = false) {
-        // 按日期分组
-        groupedNewsByDate = groupNewsByDate(newsData);
-        
-        // 获取并排序日期键
-        dateKeys = Object.keys(groupedNewsByDate).sort().reverse();
-        
-        // 计算总页数
-        totalPages = Math.ceil(dateKeys.length / DATES_PER_PAGE);
-        if (totalPages === 0) totalPages = 1;
-        
-        // 确保当前页码在有效范围内
-        if (currentPage < 1) currentPage = 1;
-        if (currentPage > totalPages) currentPage = totalPages;
-        
-        // 更新分页控件
-        updatePagination();
-        
-        // 显示当前页的新闻
-        displayCurrentPageNews(isSearchResult);
+        if (currentSource === 'crunchbase.com') {
+            // 如果是 Crunchbase，使用显示更多逻辑
+            crunchbaseNews = newsData;
+            displayCrunchbaseNews();
+        } else {
+            // 其他来源使用原有的分页逻辑
+            groupedNewsByDate = groupNewsByDate(newsData);
+            dateKeys = Object.keys(groupedNewsByDate).sort().reverse();
+            displayCurrentPageNews(isSearchResult);
+        }
+    }
+    
+    // 显示 Crunchbase 新闻
+    function displayCrunchbaseNews() {
+        const newsContainer = document.getElementById('news-container');
+        if (!newsContainer) return;
+
+        // 清空现有内容
+        newsContainer.innerHTML = '';
+
+        // 显示指定数量的新闻
+        const displayNews = crunchbaseNews.slice(0, crunchbaseDisplayCount);
+        displayNews.forEach(news => {
+            const newsCard = createNewsCard(news);
+            newsContainer.appendChild(newsCard);
+        });
+
+        // 如果还有更多新闻，显示"显示更多"按钮
+        if (crunchbaseDisplayCount < crunchbaseNews.length) {
+            const loadMoreButton = document.createElement('button');
+            loadMoreButton.className = 'load-more-button';
+            loadMoreButton.textContent = '显示更多';
+            loadMoreButton.onclick = () => {
+                crunchbaseDisplayCount += 3;
+                displayCrunchbaseNews();
+            };
+            newsContainer.appendChild(loadMoreButton);
+        }
+
+        // 隐藏分页控件
+        if (paginationContainer) {
+            paginationContainer.style.display = 'none';
+        }
     }
     
     // 更新分页控件
