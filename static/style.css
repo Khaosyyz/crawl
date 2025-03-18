@@ -608,3 +608,26 @@ footer {
         font-size: 0.9rem;
     }
 }
+
+/* 显示更多按钮样式 */
+.load-more-button {
+    display: block;
+    width: 200px;
+    margin: 20px auto;
+    padding: 10px 20px;
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.load-more-button:hover {
+    background-color: #357abd;
+}
+
+.load-more-button:active {
+    background-color: #2d6da3;
+}

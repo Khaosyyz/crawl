@@ -95,6 +95,7 @@ class SystemPrompts:
                 "完整日期时间，格式为YYYY-MM-DD HH:MM\n"
                 "根据内容自拟标题，精简且保持吸引力，确保标题中的英文和数字前后都有空格提高可读性\n"
                 "资讯内容，内容必须与作者信息完全分离，不要在内容中包含作者信息、'详情请查看'或重复来源链接（来源链接会单独保存）\n"
+                "保留原文或标题某些专有英文名词，不要翻译，例如 AI，或是公司名，人名之类\n"
                 "作者：[作者名] (@[用户名])\n"
                 "粉丝数：[粉丝数] | 点赞：[点赞数] | 转发：[转发数]\n\n"
                 "资讯内容和标题都应以新闻文笔优化原文，英文和数字前后必须加空格提高可读性。必须严格删除与AI无关的内容，"
@@ -110,7 +111,7 @@ class SystemPrompts:
                 "直接输出转换后的内容，不要添加任何前言、后语或额外说明。严格按照以下格式输出：\n\n"
                 "原文发布日期，格式为YYYY-MM-DD\n"  # 按照格式清洗
                 "根据内容给出简明扼要的中文标题，强调投资/融资相关信息\n"  # 直接给出中文标题，不要加粗、不要加引号或其他格式
-                "完整翻译的中文正文，分段清晰\n\n"  # 完整翻译的中文正文，分段清晰
+                "完整将原文的标题，内容都翻译成中文，且必须翻译成中文，分段清晰\n\n"  # 完整翻译成中文，分段清晰
                 "作者：原作者姓名\n"  # 原作者信息
                 "公司/产品：相关公司或产品名称\n"  # 从文章提取的公司或产品信息
                 "投资信息：融资金额，投资方\n\n"  # 融资信息摘要，如有
@@ -125,7 +126,7 @@ class SystemPrompts:
                 "7. 如果输入混乱或缺少关键信息，尽量从现有内容中提取逻辑，生成合理内容\n"
                 
                 "翻译要求：\n"
-                "- 必须将所有英文内容完整翻译成中文，不保留任何英文原文（公司名、产品名、人名等专有名词除外）\n"
+                "- 必须将所有非中文内容完整翻译成中文，不保留任何英文原文（公司名、产品名、人名等专有名词除外）\n"
                 "- 确保没有任何内容被跳过或保持英文状态\n"
                 "- 避免使用任何非中文表达，如俄语、法语等其他语言词汇\n"
                 "- 专业术语必须使用中文对应词汇，不要保留英文术语\n"
@@ -1098,7 +1099,7 @@ class CrunchbaseDataProcessor(BaseDataProcessor):
             content_lines = []
             author = ""
             company_product = ""
-            investment_info = ""
+            investment_info = {}
             
             # 提取原始数据中的字段（用于回退）
             original_title = original_item.get('title', '')
@@ -1142,7 +1143,7 @@ class CrunchbaseDataProcessor(BaseDataProcessor):
                     company_product = line.replace("公司/产品：", "").strip()
                 elif line.startswith("投资信息："):
                     in_content = False
-                    investment_info = line.replace("投资信息：", "").strip()
+                    investment_info_text = line.replace("投资信息：", "").strip()
                 elif in_content:
                     # 添加到内容部分
                     content_lines.append(line)
@@ -1172,18 +1173,35 @@ class CrunchbaseDataProcessor(BaseDataProcessor):
             # 生成唯一ID
             item_id = generate_id(f"{published_date}_{title}_{content_text[:50] if content_text else ''}")
             
+            # 修改投资信息解析逻辑
+            if investment_info_text:
+                # 解析融资金额
+                amount_match = re.search(r'融资金额：([^，。]+)', investment_info_text)
+                if amount_match:
+                    investment_info['amount'] = amount_match.group(1).strip()
+                
+                # 解析估值
+                valuation_match = re.search(r'估值\s*([^，。]+)', investment_info_text)
+                if valuation_match:
+                    investment_info['valuation'] = valuation_match.group(1).strip()
+                
+                # 解析投资方
+                investors_match = re.search(r'投资方：([^，。]+)', investment_info_text)
+                if investors_match:
+                    investment_info['investors'] = investors_match.group(1).strip()
+            
             # 创建解析后的数据项
             parsed_item = {
                 "id": item_id,
                 "source": "crunchbase.com",
-                "published_at": f"{published_date} 00:00",  # 添加时间后缀以满足前端要求
+                "published_at": f"{published_date} 00:00",
                 "title": title,
                 "content": content_text,
                 "author": author,
                 "source_url": source_url,
                 "company_product": company_product if company_product else "未提供",
-                "investment_info": investment_info if investment_info else "未提供",
-                "published_date": original_published_date,  # 添加原始发布日期字段
+                "investment_info": investment_info,  # 改为对象格式
+                "published_date": original_published_date,
                 "meta": {
                     "cleaned_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
