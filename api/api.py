@@ -88,16 +88,34 @@ def get_articles():
             'per_page': per_page,
             'data': articles
         }
+        
+        # 检查是否是 JSONP 请求
+        callback = request.args.get('callback')
+        if callback:
+            # 如果是 JSONP 请求，返回带有回调的 JavaScript
+            jsonp_response = f"{callback}({json.dumps(response_data, cls=MongoJSONEncoder)})"
+            return Response(jsonp_response, mimetype='application/javascript')
+        
         logger.debug(f"响应数据: {response_data}")
         return jsonify(response_data)
     except Exception as e:
         logger.error(f"获取文章列表出错: {e}")
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return jsonify({
+        
+        # 检查是否是 JSONP 请求
+        callback = request.args.get('callback')
+        error_response = {
             'status': 'error',
             'message': '获取文章列表失败，请稍后再试',
             'error': str(e)
-        }), 500
+        }
+        
+        if callback:
+            # 如果是 JSONP 请求，返回带有回调的 JavaScript
+            jsonp_response = f"{callback}({json.dumps(error_response, cls=MongoJSONEncoder)})"
+            return Response(jsonp_response, mimetype='application/javascript')
+            
+        return jsonify(error_response), 500
 
 @app.route('/api/articles/<article_id>')
 def get_article(article_id):

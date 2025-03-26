@@ -141,62 +141,54 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
         
-        // 使用新的 API 端点
-        const apiUrl = 'https://crawl-beta.vercel.app/api/articles';
+        // 使用 JSONP 方式请求数据
+        const apiUrl = 'https://crawl-beta.vercel.app/api/articles?callback=handleApiResponse';
         
-        fetch(apiUrl, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        })
-            .then(response => {
-                // 检查HTTP状态
-                if (!response.ok) {
-                    throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then(result => {
-                // 标记加载完成
-                isLoading = false;
-                
-                // 恢复刷新按钮
-                if (refreshButton) {
-                    refreshButton.disabled = false;
-                    refreshButton.classList.remove('disabled');
-                }
-                
-                if (result.status === 'error') {
-                    showError(result.message);
-                    return;
-                }
+        // 创建一个全局回调函数
+        window.handleApiResponse = function(result) {
+            // 移除脚本标签
+            const scriptElement = document.getElementById('jsonp-script');
+            if (scriptElement) {
+                scriptElement.remove();
+            }
+            
+            // 标记加载完成
+            isLoading = false;
+            
+            // 恢复刷新按钮
+            if (refreshButton) {
+                refreshButton.disabled = false;
+                refreshButton.classList.remove('disabled');
+            }
+            
+            if (result.status === 'error') {
+                showError(result.message);
+                return;
+            }
 
-                // 保存所有数据
-                allNewsData = result.data || [];
+            // 保存所有数据
+            allNewsData = result.data || [];
 
-                // 重置为第一页
-                currentPage = 1;
-                
-                // 根据当前选中的标签过滤并显示新闻
-                filterAndDisplayNews();
-            })
-            .catch(error => {
-                // 标记加载完成
-                isLoading = false;
-                
-                // 恢复刷新按钮
-                if (refreshButton) {
-                    refreshButton.disabled = false;
-                    refreshButton.classList.remove('disabled');
-                }
-                
-                console.error('获取数据失败:', error);
-                showError('获取数据失败，请稍后再试: ' + error.message);
-            });
+            // 重置为第一页
+            currentPage = 1;
+            
+            // 根据当前选中的标签过滤并显示新闻
+            filterAndDisplayNews();
+        };
+        
+        // 创建脚本标签
+        const script = document.createElement('script');
+        script.id = 'jsonp-script';
+        script.src = apiUrl;
+        script.onerror = function() {
+            isLoading = false;
+            if (refreshButton) {
+                refreshButton.disabled = false;
+                refreshButton.classList.remove('disabled');
+            }
+            showError('获取数据失败，请稍后再试');
+        };
+        document.body.appendChild(script);
     }
 
     // 执行搜索
