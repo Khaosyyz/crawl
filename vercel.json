@@ -3,5 +3,10 @@
         { "source": "/api/hello", "destination": "/api/hello" },
         { "source": "/api/articles", "destination": "/api/articles" },
         { "source": "/api/stats", "destination": "/api/stats" }
-    ]
+    ],
+    "functions": {
+        "api/**/*.py": {
+            "runtime": "python3.9"
+        }
+    }
 } 
