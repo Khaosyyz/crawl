@@ -138,7 +138,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // 标记为正在加载
         isLoading = true;
         
-        fetch('/api/news')
+        // 显示加载状态
+        newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
+        
+        // 使用新的 API 端点
+        const apiUrl = 'https://crawl-beta.vercel.app/api/articles';
+        
+        fetch(apiUrl)
             .then(response => {
                 // 检查HTTP状态
                 if (!response.ok) {
@@ -201,8 +207,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 使用后端API进行搜索
-        fetch(`/api/search?q=${encodeURIComponent(query)}`)
+        // 显示加载状态
+        newsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
+        
+        // 使用新的搜索 API 端点
+        const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}`;
+        
+        fetch(searchApiUrl)
             .then(response => {
                 // 检查HTTP状态
                 if (!response.ok) {
@@ -216,11 +227,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                // 获取搜索结果并根据当前标签过滤
-                if (result.no_results) {
+                // 获取搜索结果
+                const searchData = result.data || [];
+                
+                if (searchData.length === 0) {
                     showError(`没有和"${query}"相关的资讯`);
                 } else {
-                    const searchData = result.data || [];
                     // 根据当前选中的标签再次过滤搜索结果
                     const filteredSearchData = filterBySource(searchData);
                     
@@ -602,198 +614,113 @@ document.addEventListener('DOMContentLoaded', function() {
                d1.getDate() === d2.getDate();
     }
 
-    // 创建新闻卡片
+    // 创建单个新闻卡片
     function createNewsCard(news) {
-        const newsCard = document.createElement('div');
-        newsCard.className = 'news-card';
-
-        // 获取时间部分 (HH:MM)
-        let timeStr = '';
-        if (news.date_time) {
-            timeStr = news.date_time.split(' ')[1] || '';
-        } else if (news.published_at && news.source === 'x.com') {
-            // 对于X.com数据，从published_at获取时间部分
-            timeStr = news.published_at.split(' ')[1] || '';
-        }
-
-        // 格式化内容，保留链接
-        const formattedContent = formatContent(news.content);
-        
-        // 创建卡片内容HTML
-        let cardHTML = `
-            <div class="news-header">
-                <h2 class="news-title">${escapeHtml(news.title)}</h2>
-                <div class="news-time">${timeStr}</div>
-            </div>`;
-        
-        // 为Crunchbase内容添加特殊处理
-        if (news.source === 'crunchbase.com') {
-            const contentId = `content-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            cardHTML += `
-                <div id="${contentId}" class="news-content collapsed">${formattedContent}</div>
-                <div class="content-toggle" data-content-id="${contentId}">显示更多</div>
-            `;
-        } else {
-            cardHTML += `<div class="news-content">${formattedContent}</div>`;
-        }
-        
-        // 创建底部信息 - 根据来源显示不同信息
-        if (news.source === 'crunchbase.com') {
-            // 为Crunchbase内容创建专用的底部信息
+        try {
+            const card = document.createElement('article');
+            card.className = 'news-card';
             
-            // 直接使用数据库中的字段，而不是从内容中提取
-            const investmentAmount = news.investment_amount || 'N/A';
-            const investors = Array.isArray(news.investors) ? news.investors : [];
-            const companyProduct = news.company_product || '未知';
-            const sourceUrl = news.source_url || ''; // 获取来源URL
-            
-            // 创建唯一ID用于展开/收起投资者信息
-            const investorsId = `investors-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            // 创建唯一ID用于展开/收起投资金额信息
-            const amountId = `amount-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            
-            // 改进投资者列表展示逻辑
-            let previewInvestors = '';
-            let moreInvestors = '';
-            let hasMoreInvestors = false;
-            
-            if (investors.length > 0) {
-                if (investors.length > 2) {
-                    // 只显示前两个，其余作为"更多"内容
-                    previewInvestors = investors.slice(0, 2).join(', ');
-                    moreInvestors = investors.slice(2).join(', ');
-                    hasMoreInvestors = true;
-                } else {
-                    previewInvestors = investors.join(', ');
-                }
-            } else {
-                previewInvestors = '无数据';
+            // 根据来源设置不同的样式
+            if (news.source === 'x.com') {
+                card.classList.add('x-news');
+            } else if (news.source === 'crunchbase.com') {
+                card.classList.add('crunchbase-news');
             }
             
-            // 添加投资金额展示逻辑
-            const MAX_AMOUNT_LENGTH = 30; // 设置最大显示长度
-            let previewAmount = '';
-            let moreAmount = '';
-            let hasMoreAmount = false;
+            // 获取新闻数据，适配新的 API 数据结构
+            const source = news.source || '';
+            const sourceUrl = news.source_url || '';
+            const title = news.title || '';
+            const content = news.content || '';
+            const dateTime = news.date_time || '';
             
-            if (investmentAmount && investmentAmount !== 'N/A' && investmentAmount.length > MAX_AMOUNT_LENGTH) {
-                previewAmount = investmentAmount.substring(0, MAX_AMOUNT_LENGTH);
-                moreAmount = investmentAmount.substring(MAX_AMOUNT_LENGTH);
-                hasMoreAmount = true;
-            } else {
-                previewAmount = investmentAmount;
-            }
+            // X.com 特有字段，可能存在于 raw 字段中
+            let author = news.author || '';
+            let username = '';
+            let followersCount = 0;
+            let favoriteCount = 0;
+            let retweetCount = 0;
             
-            // 构建卡片HTML
-            cardHTML += `
-                <div class="news-footer crunchbase-footer">
-                    <div class="news-author">${escapeHtml(news.author)}</div>
-                    <div class="news-investment-info">
-                        <div class="investment-row">
-                            <span class="info-label">公司/产品:</span>
-                            <span class="info-value">${escapeHtml(companyProduct)}</span>
-                        </div>
-                        <div class="investment-row">
-                            <span class="info-label">投资金额:</span>
-                            <div class="investor-container">
-                                <span class="info-value investors-preview">${previewAmount}</span>
-                                ${hasMoreAmount ? 
-                                    `<span class="more-indicator">...</span>
-                                     <span class="investors-toggle" data-state="collapsed" data-id="${amountId}">展开</span>
-                                     <div id="${amountId}" class="more-investors" style="display: none;">
-                                        <span class="more-content">${moreAmount}</span>
-                                        <span class="investors-toggle" data-state="expanded" data-id="${amountId}">收起</span>
-                                     </div>` 
-                                    : ''}
-                            </div>
-                        </div>
-                        <div class="investment-row">
-                            <span class="info-label">投资方:</span>
-                            <div class="investor-container">
-                                <span class="info-value investors-preview">${previewInvestors}</span>
-                                ${hasMoreInvestors ? 
-                                    `<span class="more-indicator">...</span>
-                                     <span class="investors-toggle" data-state="collapsed" data-id="${investorsId}">展开</span>
-                                     <div id="${investorsId}" class="more-investors" style="display: none;">
-                                        <span class="more-content">, ${moreInvestors}</span>
-                                        <span class="investors-toggle" data-state="expanded" data-id="${investorsId}">收起</span>
-                                     </div>` 
-                                    : ''}
-                            </div>
-                        </div>
-                    </div>
-                    ${sourceUrl ? `<div class="news-source-link">来源：<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${formatUrlForDisplay(sourceUrl)}</a></div>` : ''}
-                </div>
-            `;
-        } else {
-            // 保持X平台的原有显示方式，但添加来源链接
-            const sourceUrl = news.source_url || ''; // 获取来源URL
-            
-            cardHTML += `
-                <div class="news-footer">
-                    <div class="news-author">${escapeHtml(news.author)}</div>
-                    <div class="news-stats">
-                        <span>粉丝: ${formatNumber(news.meta?.followers || news.stats?.followers_count || 0)}</span>
-                        <span>点赞: ${formatNumber(news.meta?.likes || news.stats?.favorite_count || 0)}</span>
-                        <span>转发: ${formatNumber(news.meta?.retweets || news.stats?.retweet_count || 0)}</span>
-                    </div>
-                    ${sourceUrl ? `<div class="news-source-link">来源：<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${formatUrlForDisplay(sourceUrl)}</a></div>` : ''}
-                </div>
-            `;
-        }
-        
-        newsCard.innerHTML = cardHTML;
-        
-        // 为Crunchbase内容添加展开/折叠事件处理
-        if (news.source === 'crunchbase.com') {
-            // 添加内容展开/折叠功能
-            const toggleButton = newsCard.querySelector('.content-toggle');
-            if (toggleButton) {
-                toggleButton.addEventListener('click', function() {
-                    const contentId = this.getAttribute('data-content-id');
-                    const contentElement = document.getElementById(contentId);
-                    
-                    if (contentElement.classList.contains('collapsed')) {
-                        contentElement.classList.remove('collapsed');
-                        this.textContent = '收起';
-                    } else {
-                        contentElement.classList.add('collapsed');
-                        this.textContent = '显示更多';
+            // 尝试从 raw 数据中提取更多信息
+            if (news.raw) {
+                if (typeof news.raw === 'string') {
+                    try {
+                        const rawData = JSON.parse(news.raw);
+                        username = rawData.username || '';
+                        followersCount = rawData.followers_count || 0;
+                        favoriteCount = rawData.favorite_count || 0;
+                        retweetCount = rawData.retweet_count || 0;
+                    } catch (e) {
+                        console.error('解析 raw 数据失败:', e);
                     }
-                });
+                } else {
+                    // raw 已经是对象
+                    username = news.raw.username || '';
+                    followersCount = news.raw.followers_count || 0;
+                    favoriteCount = news.raw.favorite_count || 0;
+                    retweetCount = news.raw.retweet_count || 0;
+                }
             }
             
-            // 改进投资者信息展开/折叠功能
-            const investorsToggles = newsCard.querySelectorAll('.investors-toggle');
-            if (investorsToggles.length > 0) {
-                investorsToggles.forEach(toggle => {
-                    toggle.addEventListener('click', function() {
-                        const toggleId = this.getAttribute('data-id');
-                        const moreContent = document.getElementById(toggleId);
-                        const moreIndicator = this.closest('.investor-container').querySelector('.more-indicator');
-                        const state = this.getAttribute('data-state');
-                        
-                        if (state === 'collapsed') {
-                            // 展开显示
-                            moreContent.style.display = 'inline';
-                            if (moreIndicator) moreIndicator.style.display = 'none';
-                            // 隐藏"展开"按钮
-                            const collapsedButtons = this.closest('.investor-container').querySelectorAll('.investors-toggle[data-state="collapsed"]');
-                            collapsedButtons.forEach(btn => btn.style.display = 'none');
-                        } else {
-                            // 收起显示
-                            moreContent.style.display = 'none';
-                            if (moreIndicator) moreIndicator.style.display = 'inline';
-                            // 显示"展开"按钮
-                            const collapsedButtons = this.closest('.investor-container').querySelectorAll('.investors-toggle[data-state="collapsed"]');
-                            collapsedButtons.forEach(btn => btn.style.display = 'inline');
-                        }
-                    });
-                });
+            // 构建卡片 HTML
+            let cardHTML = '';
+            
+            // 标题部分（如果有）
+            if (title) {
+                cardHTML += `<h3 class="news-title">${escapeHtml(title)}</h3>`;
             }
+            
+            // 内容部分
+            cardHTML += `<div class="news-content">${formatContent(content)}</div>`;
+            
+            // 元数据部分
+            cardHTML += '<div class="news-meta">';
+            
+            // 日期和来源
+            cardHTML += `<div class="news-date">${formatDate(dateTime)}</div>`;
+            cardHTML += `<div class="news-source">来源: <a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>`;
+            
+            // X.com 特有的元数据
+            if (source === 'x.com') {
+                if (author || username) {
+                    cardHTML += '<div class="news-author">';
+                    cardHTML += `作者: ${escapeHtml(author || '')}`;
+                    if (username) {
+                        if (author) cardHTML += ' ';
+                        cardHTML += `(@${escapeHtml(username)})`;
+                    }
+                    cardHTML += '</div>';
+                }
+                
+                // 社交数据
+                if (followersCount || favoriteCount || retweetCount) {
+                    cardHTML += '<div class="news-social-stats">';
+                    if (followersCount) {
+                        cardHTML += `<span class="stat followers" title="粉丝数"><i class="icon-user"></i>${formatNumber(followersCount)}</span>`;
+                    }
+                    if (favoriteCount) {
+                        cardHTML += `<span class="stat likes" title="点赞数"><i class="icon-heart"></i>${formatNumber(favoriteCount)}</span>`;
+                    }
+                    if (retweetCount) {
+                        cardHTML += `<span class="stat retweets" title="转发数"><i class="icon-retweet"></i>${formatNumber(retweetCount)}</span>`;
+                    }
+                    cardHTML += '</div>';
+                }
+            }
+            
+            cardHTML += '</div>'; // 结束 news-meta
+            
+            // 设置卡片内容
+            card.innerHTML = cardHTML;
+            
+            return card;
+        } catch (e) {
+            console.error('创建新闻卡片出错:', e, news);
+            const card = document.createElement('article');
+            card.className = 'news-card error-card';
+            card.innerHTML = '<div class="error-message">无法显示此条资讯</div>';
+            return card;
         }
-
-        return newsCard;
     }
 
     // 显示错误信息
