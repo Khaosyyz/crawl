@@ -216,11 +216,6 @@ def get_stats():
             'error': str(e)
         }), 500
 
-# Vercel 需要这个函数
-def handler(request):
-    """处理 Vercel 请求"""
-    return app(request)
-
 def main():
     """启动API服务"""
     print("API服务已启动，正在监听 http://0.0.0.0:8080")
@@ -228,3 +223,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# Vercel serverless function handler
+def handler(request, context):
+    """Vercel serverless function handler"""
+    # 创建WSGI应用的代理
+    return app
