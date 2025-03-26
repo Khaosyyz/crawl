@@ -7,6 +7,7 @@ project_root = str(Path(__file__).parent.parent)
 sys.path.append(project_root)
 
 from flask import Flask, jsonify, request, Response
+from flask_cors import CORS  # 导入 CORS
 import json
 import logging
 from db.mongodb import MongoDB
@@ -35,6 +36,7 @@ logging.basicConfig(
 logger = logging.getLogger("api")
 
 app = Flask(__name__)
+CORS(app)  # 启用 CORS，允许所有域名访问
 app.json_encoder = MongoJSONEncoder  # 使用自定义的JSON编码器
 # 禁用Flask默认日志
 app.logger.disabled = True
