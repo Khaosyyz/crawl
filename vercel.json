@@ -11,10 +11,5 @@
             "src": "/api/(.*)",
             "dest": "api/api.py"
         }
-    ],
-    "env": {
-        "MONGODB_URI": "@mongodb_uri",
-        "MONGODB_DB": "liaonews",
-        "MONGODB_COLLECTION": "articles"
-    }
+    ]
 } 
