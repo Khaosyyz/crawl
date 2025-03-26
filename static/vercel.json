@@ -1,7 +1,6 @@
 {
     "version": 2,
     "public": true,
-    "framework": "static",
     "outputDirectory": "./",
     "cleanUrls": true,
     "rewrites": [
