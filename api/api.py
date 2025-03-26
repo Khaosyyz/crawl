@@ -36,7 +36,8 @@ logging.basicConfig(
 logger = logging.getLogger("api")
 
 app = Flask(__name__)
-CORS(app)  # 启用 CORS，允许所有域名访问
+# 配置 CORS，允许所有域名访问，并添加更多选项
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
 app.json_encoder = MongoJSONEncoder  # 使用自定义的JSON编码器
 # 禁用Flask默认日志
 app.logger.disabled = True

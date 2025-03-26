@@ -144,7 +144,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // 使用新的 API 端点
         const apiUrl = 'https://crawl-beta.vercel.app/api/articles';
         
-        fetch(apiUrl)
+        fetch(apiUrl, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
             .then(response => {
                 // 检查HTTP状态
                 if (!response.ok) {
@@ -213,7 +221,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // 使用新的搜索 API 端点
         const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}`;
         
-        fetch(searchApiUrl)
+        fetch(searchApiUrl, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
             .then(response => {
                 // 检查HTTP状态
                 if (!response.ok) {
