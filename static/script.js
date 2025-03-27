@@ -262,65 +262,41 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
         
-        // 使用完整的API URL，添加source参数以便按当前标签过滤结果
-        const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}&source=${currentSource}`;
-        
-        // 设置超时控制
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超时
-        
-        fetch(searchApiUrl, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            signal: controller.signal
-        })
-        .then(response => {
-            clearTimeout(timeoutId);
-            // 检查HTTP状态
-            if (!response.ok) {
-                throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(result => {
-            if (result.status === 'error') {
-                showError(result.message);
-                return;
-            }
-
-            // 获取搜索结果
-            const searchData = result.data || [];
+        // 在本地用简单的方法实现搜索
+        if (allNewsData && allNewsData.length > 0) {
+            // 对已加载的数据进行客户端过滤
+            const filteredResults = allNewsData.filter(item => {
+                // 检查标题、内容和作者中是否包含搜索关键词
+                const searchTermLower = query.toLowerCase();
+                const titleMatch = item.title && item.title.toLowerCase().includes(searchTermLower);
+                const contentMatch = item.content && item.content.toLowerCase().includes(searchTermLower);
+                const authorMatch = item.author && item.author.toLowerCase().includes(searchTermLower);
+                
+                return titleMatch || contentMatch || authorMatch;
+            });
             
-            if (searchData.length === 0) {
+            if (filteredResults.length === 0) {
                 showError(`没有和"${query}"相关的资讯`);
             } else {
-                // 直接使用搜索结果，API已经按source过滤
-                allNewsData = searchData;
+                // 使用过滤后的结果
+                const sourceFilteredResults = filteredResults.filter(item => item.source === currentSource);
                 
-                // 重置为第一页
-                currentPage = 1;
-                
-                // 显示搜索结果
-                displayCurrentPageNews(true);
+                if (sourceFilteredResults.length === 0) {
+                    showError(`在${getSourceName(currentSource)}中没有和"${query}"相关的资讯`);
+                } else {
+                    // 更新数据
+                    allNewsData = sourceFilteredResults;
+                    
+                    // 重置为第一页
+                    currentPage = 1;
+                    
+                    // 显示搜索结果
+                    displayCurrentPageNews(true);
+                }
             }
-        })
-        .catch(error => {
-            clearTimeout(timeoutId);
-            console.error('搜索失败:', error);
-            
-            // 根据错误类型显示不同的错误信息
-            if (error.name === 'AbortError') {
-                showError('搜索请求超时，请稍后再试');
-            } else if (error.message.includes('Failed to fetch')) {
-                showError('无法连接到搜索服务，请检查网络连接或稍后再试');
-            } else {
-                showError('搜索处理失败: ' + error.message);
-            }
-        });
+        } else {
+            showError('请先加载数据，然后再搜索');
+        }
     }
 
     // 根据数据源过滤数据
