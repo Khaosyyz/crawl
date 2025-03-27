@@ -39,17 +39,4 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-
-def handler(request):
-    """简单的测试函数"""
-    return {
-        "statusCode": 200,
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "body": json.dumps({
-            "message": "Hello from index.py",
-            "path": request.get('path', 'unknown')
-        })
-    } 
+        self.end_headers() 
