@@ -750,8 +750,9 @@ footer {
     font-size: 0.85rem;
     color: #657786;
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    justify-content: space-between;
+    width: 100%;
+    padding: 5px 0;
 }
 
 .x-news .news-source {

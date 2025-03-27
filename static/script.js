@@ -746,7 +746,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 第二行：社交数据 (粉丝、点赞、转发)
                 cardHTML += '<div class="news-social-stats">';
-                cardHTML += `粉丝数量：${formatNumber(followersCount)} 点赞数量：${formatNumber(favoriteCount)} 转发数量：${formatNumber(retweetCount)}`;
+                cardHTML += `<span>粉丝数量：${formatNumber(followersCount)}</span>`;
+                cardHTML += `<span>点赞数量：${formatNumber(favoriteCount)}</span>`;
+                cardHTML += `<span>转发数量：${formatNumber(retweetCount)}</span>`;
                 cardHTML += '</div>';
                 
                 // 第三行：来源地址
