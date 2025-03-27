@@ -550,15 +550,6 @@ def start_all():
     if not check_dependencies():
         print("启动失败: 系统缺少必要的文件或目录")
         return False
-        
-    # 启动API服务
-    print("正在启动API服务...")
-    api_success = start_api_service()
-    if not api_success:
-        print("警告: API服务启动失败,将再次尝试")
-        # 再次尝试启动
-        time.sleep(1)  # 等待1秒后重试
-        api_success = start_api_service()
     
     # 启动数据清洗服务
     print("正在启动数据清洗服务...")
@@ -582,15 +573,8 @@ def start_all():
     print("\n===== 启动结果汇总 =====")
     
     # 读取进程ID
-    api_pid = read_pid(API_PID_FILE)
     cleaner_pid = read_pid(CLEANER_PID_FILE)
     scheduler_pid = read_pid(SCHEDULER_PID_FILE)
-    
-    # API服务状态
-    if api_success and api_pid and is_pid_running(api_pid):
-        print(f"API服务: 成功启动 (PID: {api_pid})")
-    else:
-        print("API服务: 启动失败 ✗ - 请检查logs/api.log获取更多信息")
     
     # 数据清洗服务状态
     if cleaner_success and cleaner_pid and is_pid_running(cleaner_pid):
@@ -605,9 +589,8 @@ def start_all():
         print("爬虫定时任务: 启动失败 ✗ - 请检查logs/scheduler.log获取更多信息")
     
     # 服务启动总结
-    if api_success and cleaner_success and scheduler_success:
+    if cleaner_success and scheduler_success:
         print("\n所有服务已启动成功！")
-        print("\n前端网页访问地址: http://localhost:8080")
         return True
     else:
         print("\n警告: 部分服务未能成功启动,请检查日志文件了解详情")
@@ -617,19 +600,8 @@ def start_all():
 def stop_all():
     """停止所有服务"""
     print("正在停止所有服务...")
-    api_stopped = stop_service("API服务", API_PID_FILE, API_PORT)
     cleaner_stopped = stop_service("数据清洗服务", CLEANER_PID_FILE)
     scheduler_stopped = stop_scheduler()
-    
-    # 再次检查API端口是否还在使用，自动终止占用端口的进程
-    if is_port_in_use(API_PORT):
-        port_pid = get_pid_by_port(API_PORT)
-        print(f"警告: API端口 {API_PORT} 仍被进程 {port_pid} 占用，尝试终止该进程...")
-        kill_success = kill_process_by_port(API_PORT)
-        if kill_success:
-            print(f"成功终止占用端口 {API_PORT} 的进程")
-        else:
-            print(f"无法终止占用端口 {API_PORT} 的进程，可能需要手动处理")
     
     print("所有服务已停止")
     return 0
@@ -637,14 +609,6 @@ def stop_all():
 
 def status():
     """查看各服务状态"""
-    # 检查API服务
-    api_pid = read_pid(API_PID_FILE)
-    api_running = api_pid and is_process_running(api_pid)
-    
-    # 通过端口额外检查API服务
-    api_port_in_use = is_port_in_use(API_PORT)
-    api_port_pid = get_pid_by_port(API_PORT) if api_port_in_use else None
-    
     # 检查清洗服务
     cleaner_pid = read_pid(CLEANER_PID_FILE)
     cleaner_running = cleaner_pid and is_process_running(cleaner_pid)
@@ -655,16 +619,6 @@ def status():
     
     # 打印状态
     print("===== 服务状态 =====")
-    
-    # API服务状态
-    if api_running and (not api_port_in_use or api_port_pid == api_pid):
-        print(f"API服务: 运行中 (PID: {api_pid})")
-    elif not api_running and api_port_in_use:
-        print(f"API服务: 端口 {API_PORT} 被其他进程占用 (PID: {api_port_pid})")
-    elif api_running and api_port_in_use and api_port_pid != api_pid:
-        print(f"API服务: 状态异常 - PID文件记录 {api_pid}，但端口 {API_PORT} 被进程 {api_port_pid} 占用")
-    else:
-        print("API服务: 已停止")
     
     # 清洗服务状态
     print(f"数据清洗服务: {'运行中' if cleaner_running else '已停止'} " + 
@@ -874,12 +828,83 @@ def stop_scheduler():
     return True
 
 
+def start(args=None):
+    """启动系统的所有组件"""
+    print("正在启动AI资讯聚合系统...")
+    
+    # 检查Python包依赖
+    try:
+        import pkg_resources
+        
+        # 从requirements.txt读取依赖列表
+        requirements_path = os.path.join(BASE_DIR, "requirements.txt")
+        if os.path.exists(requirements_path):
+            with open(requirements_path, 'r') as f:
+                dependencies = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                
+            # 验证每个依赖是否已安装
+            missing_deps = []
+            for dep in dependencies:
+                try:
+                    # 移除版本限制，只检查包名
+                    package_name = dep.split('==')[0].split('>=')[0].split('<=')[0].strip()
+                    pkg_resources.get_distribution(package_name)
+                except pkg_resources.DistributionNotFound:
+                    missing_deps.append(package_name)
+                    
+            if missing_deps:
+                print(f"警告: 以下Python包未安装: {', '.join(missing_deps)}")
+                print("建议使用 'pip install -r requirements.txt' 安装所有依赖")
+        
+    except ImportError:
+        print("警告: 无法导入pkg_resources模块,跳过Python包依赖检查")
+        print("提示: 这通常意味着setuptools包未正确安装")
+
+    # 不再启动API服务
+    # success_api = start_api_service()
+    
+    # 启动数据清洗服务
+    success_cleaner = start_cleaner_service()
+    
+    # 启动爬虫定时任务
+    success_scheduler = start_scheduler()
+    
+    # 显示启动结果摘要
+    print("\n===== 启动结果汇总 =====")
+    # print(f"API服务: {'成功启动 (PID: ' + str(read_pid(API_PID_FILE)) + ')' if success_api else '启动失败 ✗ - 请检查logs/api.log获取更多信息'}")
+    print(f"数据清洗服务: {'成功启动 (PID: ' + str(read_pid(CLEANER_PID_FILE)) + ')' if success_cleaner else '启动失败 ✗ - 请检查logs/cleaner.log获取更多信息'}")
+    print(f"爬虫定时任务: {'成功启动 (PID: ' + str(read_pid(SCHEDULER_PID_FILE)) + ')' if success_scheduler else '启动失败 ✗ - 请检查logs/scheduler.log获取更多信息'}")
+    
+    # if not (success_api and success_cleaner and success_scheduler):
+    if not (success_cleaner and success_scheduler):
+        print("\n警告: 部分服务未能成功启动,请检查日志文件了解详情")
+        return 1
+        
+    print("\n系统启动完成! 使用 'python main.py status' 查看系统状态")
+    return 0
+
+def stop(args=None):
+    """停止系统的所有组件"""
+    print("正在停止AI资讯聚合系统...")
+    
+    # 不再停止API服务
+    # stop_api_service()
+    
+    # 停止数据清洗服务
+    stop_cleaner_service()
+    
+    # 停止爬虫定时任务
+    stop_scheduler()
+    
+    print("\n系统已停止")
+    return 0
+
 def main():
     """主函数,解析命令行参数并执行相应操作"""
     parser = argparse.ArgumentParser(description="AI资讯聚合系统控制程序")
-    parser.add_argument('action', choices=['start', 'stop', 'restart', 'status', 'crawler', 'api', 'cleaner', 'scheduler'],
+    parser.add_argument('action', choices=['start', 'stop', 'restart', 'status', 'crawler', 'cleaner', 'scheduler'],
                         help='要执行的操作: start启动所有服务, stop停止所有服务, restart重启所有服务, ' +
-                             'status查看状态, crawler运行爬虫, api仅启动API服务, cleaner仅启动清洗服务, ' + 
+                             'status查看状态, crawler运行爬虫, cleaner仅启动清洗服务, ' + 
                              'scheduler仅启动调度器')
     
     if len(sys.argv) == 1:
@@ -906,14 +931,6 @@ def main():
             print("启动爬虫失败: 系统缺少必要的文件或目录")
             sys.exit(1)
         run_all_crawlers()
-    elif args.action == 'api':
-        api_script = os.path.join(API_DIR, 'api.py')
-        if os.path.isfile(api_script):
-            start_api_service()
-            print(f"API服务已启动 (PID: {read_pid(API_PID_FILE)})")
-        else:
-            print(f"错误: 找不到 {api_script} 文件")
-            sys.exit(1)
     elif args.action == 'cleaner':
         cleaner_script = os.path.join(CLEAN_DIR, 'cleandata.py')
         if os.path.isfile(cleaner_script):
