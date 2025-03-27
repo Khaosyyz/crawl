@@ -157,65 +157,90 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 获取数据
-    async function fetchData() {
-        try {
-            // 获取当前选中的来源
-            const currentSource = document.querySelector('.tab-button.active')?.dataset.source || 'x.com';
-            
-            // 获取当前页的数据
-            const response = await fetch(`https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentPage}`, {
-                cache: 'no-cache'
-            });
-            
+    // 获取数据函数
+    function fetchData() {
+        // 标记为正在加载
+        isLoading = true;
+        
+        // 显示加载状态
+        newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
+        
+        // 构建API URL，添加date_page参数
+        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentPage}`;
+        
+        // 执行第一个请求
+        fetchAllPages(apiUrl);
+    }
+    
+    // 获取所有页面的数据
+    function fetchAllPages(apiUrl, currentPageNum = 1, allData = []) {
+        fetch(`${apiUrl}&page=${currentPageNum}`, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => {
+            // 检查HTTP状态
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(result => {
+            if (result.status === 'error') {
+                showError(result.message);
+                return;
             }
             
-            const result = await response.json();
+            // 将当前页面的数据添加到累积数据中
+            const combinedData = [...allData, ...result.data];
             
-            if (result.status === 'success') {
-                // 设置总页数
-                totalPages = result.total_date_pages;
+            // 更新总页数
+            totalPages = result.total_date_pages;
+            
+            // 如果总数大于9且当前页数小于总页数，获取下一页数据
+            const total = result.total;
+            const perPage = result.per_page;
+            const totalNumPages = Math.ceil(total / perPage);
+            
+            if (currentPageNum < totalNumPages) {
+                // 继续获取下一页
+                fetchAllPages(apiUrl, currentPageNum + 1, combinedData);
+            } else {
+                // 所有页面数据获取完毕
+                isLoading = false;
                 
-                // 获取所有页面的数据
-                const allPagesData = [];
-                const totalPagesNeeded = Math.ceil(result.total / result.per_page);
-                
-                // 获取第一页数据
-                allPagesData.push(...result.data);
-                
-                // 获取剩余页面的数据
-                for (let page = 2; page <= totalPagesNeeded; page++) {
-                    const nextPageResponse = await fetch(`https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentPage}&page=${page}`, {
-                        cache: 'no-cache'
-                    });
-                    
-                    if (!nextPageResponse.ok) {
-                        throw new Error(`HTTP error! status: ${nextPageResponse.status}`);
-                    }
-                    
-                    const nextPageResult = await nextPageResponse.json();
-                    if (nextPageResult.status === 'success') {
-                        allPagesData.push(...nextPageResult.data);
-                    }
+                // 恢复刷新按钮
+                if (refreshButton) {
+                    refreshButton.disabled = false;
+                    refreshButton.classList.remove('disabled');
                 }
                 
-                // 更新全局数据
-                allNewsData = allPagesData;
+                // 更新数据
+                allNewsData = combinedData;
                 
-                // 显示新闻
-                displayCurrentPageNews();
+                // 处理并显示数据
+                processAndDisplayNews(allNewsData);
                 
                 // 更新分页控件
                 updatePagination();
-            } else {
-                showError('获取数据失败');
             }
-        } catch (error) {
-            console.error('获取数据失败:', error);
-            showError('获取数据失败，请稍后重试');
-        }
+        })
+        .catch(error => {
+            // 标记加载完成
+            isLoading = false;
+            
+            // 恢复刷新按钮
+            if (refreshButton) {
+                refreshButton.disabled = false;
+                refreshButton.classList.remove('disabled');
+            }
+            
+            showError(`获取数据失败: ${error.message}`);
+        });
     }
 
     // 执行搜索
