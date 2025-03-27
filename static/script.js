@@ -165,8 +165,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
         
-        // 使用完整的API URL
-        const apiUrl = 'https://crawl-beta.vercel.app/api/articles';
+        // 构建API URL，添加date_page参数
+        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentPage}`;
         
         fetch(apiUrl, {
             method: 'GET',
@@ -200,12 +200,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // 保存所有数据
                 allNewsData = result.data || [];
-
-                // 重置为第一页
-                currentPage = 1;
                 
-                // 根据当前选中的标签过滤并显示新闻
-                filterAndDisplayNews();
+                // 更新总页数
+                totalPages = result.total_date_pages || 1;
+                
+                // 显示数据
+                displayCurrentPageNews();
+                
+                // 更新分页控件
+                updatePagination();
             })
             .catch(error => {
                 // 标记加载完成
@@ -234,15 +237,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!query) {
             // 如果查询为空，直接显示全部数据
-            filterAndDisplayNews();
+            forceRefreshData();
             return;
         }
 
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
         
-        // 使用完整的API URL
-        const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}`;
+        // 使用完整的API URL，添加source参数以便按当前标签过滤结果
+        const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}&source=${currentSource}`;
         
         fetch(searchApiUrl, {
             method: 'GET',
@@ -272,15 +275,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (searchData.length === 0) {
                     showError(`没有和"${query}"相关的资讯`);
                 } else {
-                    // 根据当前选中的标签再次过滤搜索结果
-                    const filteredSearchData = filterBySource(searchData);
+                    // 直接使用搜索结果，API已经按source过滤
+                    allNewsData = searchData;
                     
-                    if (filteredSearchData.length === 0) {
-                        showError(`没有和"${query}"相关的${getSourceName(currentSource)}资讯`);
-                    } else {
-                        // 处理分页
-                        processAndDisplayNews(filteredSearchData, true);
-                    }
+                    // 重置为第一页
+                    currentPage = 1;
+                    
+                    // 显示搜索结果
+                    displayCurrentPageNews(true);
                 }
             })
             .catch(error => {
@@ -491,20 +493,23 @@ document.addEventListener('DOMContentLoaded', function() {
         newsContainer.innerHTML = '';
         
         // 检查是否有数据
-        if (!dateKeys || dateKeys.length === 0) {
+        if (!allNewsData || allNewsData.length === 0) {
             showError(isSearchResult ? '没有找到匹配的结果' : '暂无资讯数据');
             return;
         }
         
-        // 计算当前页应该显示的日期范围
-        const startIndex = (currentPage - 1) * DATES_PER_PAGE;
-        const endIndex = Math.min(startIndex + DATES_PER_PAGE, dateKeys.length);
+        // 按日期分组数据
+        groupedNewsByDate = groupNewsByDate(allNewsData);
+        dateKeys = Object.keys(groupedNewsByDate).sort().reverse();
         
-        // 获取当前页的日期
-        const currentPageDates = dateKeys.slice(startIndex, endIndex);
+        // 检查是否有日期数据
+        if (dateKeys.length === 0) {
+            showError(isSearchResult ? '没有找到匹配的结果' : '暂无资讯数据');
+            return;
+        }
         
-        // 遍历当前页的每个日期组
-        currentPageDates.forEach(date => {
+        // 遍历每个日期组
+        dateKeys.forEach(date => {
             // 创建日期分组标题
             const dateHeader = document.createElement('div');
             dateHeader.className = 'date-header';
@@ -517,12 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
             // 创建新闻卡片容器
             const groupContainer = document.createElement('div');
-            // 根据当前数据源设置不同的布局方式
-            if (currentSource === 'crunchbase.com') {
-                groupContainer.className = 'news-group crunchbase-style';
-            } else {
-                groupContainer.className = 'news-group';
-            }
+            groupContainer.className = 'news-group';
             groupContainer.dataset.date = date;
         
             // 是否需要"展开更多"按钮
@@ -541,12 +541,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (needsExpansion) {
                 // 创建隐藏的容器用于存放额外的新闻
                 const hiddenContainer = document.createElement('div');
-                // 根据当前数据源设置不同的布局方式
-                if (currentSource === 'crunchbase.com') {
-                    hiddenContainer.className = 'news-group hidden-news crunchbase-style';
-                } else {
-                    hiddenContainer.className = 'news-group hidden-news';
-                }
+                hiddenContainer.className = 'news-group hidden-news';
                 hiddenContainer.id = `hidden-news-${date.replace(/[^a-zA-Z0-9]/g, '-')}`;
                 hiddenContainer.style.display = 'none';
         
@@ -573,12 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const hiddenNews = document.getElementById(hiddenNewsId);
         
                     if (this.dataset.expanded === 'false') {
-                        // 根据当前数据源使用不同的展开方式
-                        if (currentSource === 'crunchbase.com') {
-                            hiddenNews.style.display = 'flex';  // 使用flex布局而不是grid
-                        } else {
-                            hiddenNews.style.display = 'grid';
-                        }
+                        hiddenNews.style.display = 'grid';
                         this.querySelector('button').textContent = '收起';
                         this.dataset.expanded = 'true';
                     } else {
