@@ -16,21 +16,13 @@ from selenium.webdriver.chrome.service import Service
 # 常量定义
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
-# AI API 相关配置
-API_KEY = 'p9mtsT4ioDYm1'
-API_BASE_URL = 'https://ai.liaobots.work/v1'
-MODEL_NAME = 'Gemini-2.5-Pro-Exp'
-
-# 初始化 OpenAI 客户端
-client = OpenAI(
-    api_key=API_KEY,
-    base_url=API_BASE_URL
-)
-
 # 获取 X 目录路径 - 修正为当前目录
 X_DIR = os.path.dirname(os.path.abspath(__file__))
 if not os.path.exists(X_DIR):
     os.makedirs(X_DIR)
+
+# 无效账号文件路径
+INVALID_ACCOUNTS_FILE = os.path.join(X_DIR, "x_invalid_account.txt")
 
 # 多账号配置
 ACCOUNTS = [
@@ -46,24 +38,22 @@ ACCOUNTS = [
     },
 ]
 
-# 保留无效账号处理相关的函数
 def load_invalid_accounts():
     """加载已知的无效账号列表"""
     invalid_accounts = set()
-    # 无效账号文件路径
-    invalid_accounts_file = os.path.join(X_DIR, "x_invalid_account.txt")
-    if os.path.exists(invalid_accounts_file):
-        with open(invalid_accounts_file, 'r', encoding='utf-8') as f:
+    if os.path.exists(INVALID_ACCOUNTS_FILE):
+        with open(INVALID_ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
             for line in f:
                 invalid_accounts.add(line.strip())
     return invalid_accounts
 
+
 def mark_account_as_invalid(username):
     """将账号标记为无效"""
-    invalid_accounts_file = os.path.join(X_DIR, "x_invalid_account.txt")
-    with open(invalid_accounts_file, 'a', encoding='utf-8') as f:
+    with open(INVALID_ACCOUNTS_FILE, 'a', encoding='utf-8') as f:
         f.write(f"{username}\n")
     print(f"账号 {username} 已被标记为无效，将从可用账号列表中移除")
+
 
 def get_valid_accounts():
     """获取有效的账号列表，排除已知的无效账号"""
@@ -73,8 +63,7 @@ def get_valid_accounts():
     if not valid_accounts:
         print("警告: 所有账号均已标记为无效，将重置无效账号列表")
         # 如果所有账号都无效，则清空无效账号列表，重新尝试所有账号
-        invalid_accounts_file = os.path.join(X_DIR, "x_invalid_account.txt")
-        with open(invalid_accounts_file, 'w', encoding='utf-8') as f:
+        with open(INVALID_ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
             f.write("")
         return ACCOUNTS
     
@@ -117,7 +106,9 @@ class XCrawler:
         # 记录最后一次cookie更新时间的文件
         self.COOKIE_TIME_FILE = os.path.join(self.COOKIES_DIR, f"{self.USERNAME}_last_update.txt")
         
+        # 移除删除其他账号cookie的逻辑，保留所有账号的cookie文件
         print(f"使用账号 {self.USERNAME} 的cookie文件: {self.COOKIES_FILE}")
+        
         
         # 确保用户数据目录存在
         if not os.path.exists(self.USER_DATA_DIR):
@@ -1429,6 +1420,12 @@ class XCrawler:
         except Exception as e:
             print(f"保存到临时存储时出错: {e}")
 
+    def follow_blogger(self, blogger_url):
+        """关注博主"""
+        # 该方法不再需要，但为了保持代码结构，保留其签名，内部代码移除
+        print("博主关注功能已被禁用")
+        return False
+
     def close(self):
         """关闭浏览器并清理资源"""
         if self.driver:
@@ -1530,7 +1527,6 @@ class XCrawler:
             # 刷新cookie - 访问一些安全的页面来确保cookie活跃
             self._refresh_cookie()
 
-            # 爬取资讯
             print("\n===== 爬取资讯 =====")
             
             # 先获取已有的数据，避免重复爬取
