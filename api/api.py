@@ -155,10 +155,20 @@ def search_articles():
         # 获取分页参数
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 10))
+        # 获取数据源过滤参数
+        source = request.args.get('source')
+        
+        # 构建搜索条件
+        search_criteria = {}
+        
+        # 如果指定了数据源，添加到搜索条件中
+        if source:
+            search_criteria['source'] = source
         
         # 执行全文搜索
         results = db.search_articles(
             query=query,
+            search_criteria=search_criteria,
             skip=(page - 1) * per_page,
             limit=per_page
         )

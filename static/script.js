@@ -265,48 +265,62 @@ document.addEventListener('DOMContentLoaded', function() {
         // 使用完整的API URL，添加source参数以便按当前标签过滤结果
         const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}&source=${currentSource}`;
         
+        // 设置超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超时
+        
         fetch(searchApiUrl, {
             method: 'GET',
             mode: 'cors',
             cache: 'no-cache',
-            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
             },
+            signal: controller.signal
         })
-            .then(response => {
-                // 检查HTTP状态
-                if (!response.ok) {
-                    throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then(result => {
-                if (result.status === 'error') {
-                    showError(result.message);
-                    return;
-                }
+        .then(response => {
+            clearTimeout(timeoutId);
+            // 检查HTTP状态
+            if (!response.ok) {
+                throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(result => {
+            if (result.status === 'error') {
+                showError(result.message);
+                return;
+            }
 
-                // 获取搜索结果
-                const searchData = result.data || [];
+            // 获取搜索结果
+            const searchData = result.data || [];
+            
+            if (searchData.length === 0) {
+                showError(`没有和"${query}"相关的资讯`);
+            } else {
+                // 直接使用搜索结果，API已经按source过滤
+                allNewsData = searchData;
                 
-                if (searchData.length === 0) {
-                    showError(`没有和"${query}"相关的资讯`);
-                } else {
-                    // 直接使用搜索结果，API已经按source过滤
-                    allNewsData = searchData;
-                    
-                    // 重置为第一页
-                    currentPage = 1;
-                    
-                    // 显示搜索结果
-                    displayCurrentPageNews(true);
-                }
-            })
-            .catch(error => {
-                console.error('搜索失败:', error);
-                showError('搜索处理失败，请稍后再试: ' + error.message);
-            });
+                // 重置为第一页
+                currentPage = 1;
+                
+                // 显示搜索结果
+                displayCurrentPageNews(true);
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeoutId);
+            console.error('搜索失败:', error);
+            
+            // 根据错误类型显示不同的错误信息
+            if (error.name === 'AbortError') {
+                showError('搜索请求超时，请稍后再试');
+            } else if (error.message.includes('Failed to fetch')) {
+                showError('无法连接到搜索服务，请检查网络连接或稍后再试');
+            } else {
+                showError('搜索处理失败: ' + error.message);
+            }
+        });
     }
 
     // 根据数据源过滤数据
@@ -550,23 +564,64 @@ document.addEventListener('DOMContentLoaded', function() {
         
             newsContainer.appendChild(groupContainer);
 
+            // 创建按钮容器
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'news-buttons-container';
+            newsContainer.appendChild(buttonContainer);
+
             // 如果该日期组有超过9条新闻，添加"显示更多"按钮
             if (dateGroup.length > 9) {
                 const loadMoreButton = document.createElement('button');
                 loadMoreButton.className = 'load-more-button';
                 loadMoreButton.textContent = '显示更多';
                 loadMoreButton.dataset.date = date;
+                
+                // 额外的新闻卡片容器 (用于存放剩余新闻)
+                const extraNewsContainer = document.createElement('div');
+                extraNewsContainer.className = 'extra-news-container';
+                extraNewsContainer.style.display = 'none'; // 初始隐藏
+                extraNewsContainer.dataset.date = date;
+                
+                // 准备剩余的新闻卡片
+                const remainingNews = dateGroup.slice(9);
+                remainingNews.forEach(news => {
+                    const newsCard = createNewsCard(news);
+                    extraNewsContainer.appendChild(newsCard);
+                });
+                
+                // 将额外的新闻容器添加到DOM中
+                groupContainer.after(extraNewsContainer);
+                
+                // 创建收起按钮但初始不显示
+                const collapseButton = document.createElement('button');
+                collapseButton.className = 'collapse-button';
+                collapseButton.textContent = '收起';
+                collapseButton.dataset.date = date;
+                collapseButton.style.display = 'none'; // 初始隐藏
+                
+                // 点击显示更多按钮时的逻辑
                 loadMoreButton.onclick = () => {
-                    // 移除"显示更多"按钮
-                    loadMoreButton.remove();
-                    // 显示剩余的新闻
-                    const remainingNews = dateGroup.slice(9);
-                    remainingNews.forEach(news => {
-                        const newsCard = createNewsCard(news);
-                        groupContainer.appendChild(newsCard);
-                    });
+                    // 显示额外的新闻
+                    extraNewsContainer.style.display = 'grid';
+                    // 隐藏显示更多按钮
+                    loadMoreButton.style.display = 'none';
+                    // 显示收起按钮
+                    collapseButton.style.display = 'block';
                 };
-                newsContainer.appendChild(loadMoreButton);
+                
+                // 点击收起按钮时的逻辑
+                collapseButton.onclick = () => {
+                    // 隐藏额外的新闻
+                    extraNewsContainer.style.display = 'none';
+                    // 显示显示更多按钮
+                    loadMoreButton.style.display = 'block';
+                    // 隐藏收起按钮
+                    collapseButton.style.display = 'none';
+                };
+                
+                // 添加按钮到按钮容器
+                buttonContainer.appendChild(loadMoreButton);
+                buttonContainer.appendChild(collapseButton);
             }
         });
     }

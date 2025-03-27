@@ -176,11 +176,12 @@ class MongoDB:
             logger.error(f"根据ID获取文章失败: {e}")
             return None
     
-    def search_articles(self, query: str, skip: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
+    def search_articles(self, query: str, search_criteria: Dict[str, Any] = None, skip: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
         """搜索文章
         
         Args:
             query: 搜索关键词
+            search_criteria: 附加搜索条件，例如 {"source": "x.com"}
             skip: 跳过的文档数
             limit: 返回的文档数
             
@@ -188,8 +189,11 @@ class MongoDB:
             匹配的文章列表
         """
         try:
+            if search_criteria is None:
+                search_criteria = {}
+            
             # 增强搜索功能，支持多字段搜索和部分匹配
-            search_query = {
+            text_search_query = {
                 "$or": [
                     # 全文搜索
                     {"$text": {"$search": query}},
@@ -202,8 +206,11 @@ class MongoDB:
                 ]
             }
             
+            # 合并附加搜索条件和文本搜索条件
+            final_query = {**text_search_query, **search_criteria}
+            
             # 先尝试使用全文搜索排序（如果匹配），然后按日期排序
-            cursor = self.collection.find(search_query)
+            cursor = self.collection.find(final_query)
             
             # 按日期倒序排序
             cursor = cursor.sort([("date_time", -1)])
