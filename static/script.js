@@ -1,4 +1,28 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // 脚本版本检查
+    const scriptVersion = '1.0.1'; // 更新版本号
+    const lastVersion = localStorage.getItem('scriptVersion');
+    
+    // 如果版本不匹配，清除缓存并刷新
+    if (lastVersion !== scriptVersion) {
+        console.log(`版本更新: ${lastVersion || '无'} -> ${scriptVersion}`);
+        localStorage.setItem('scriptVersion', scriptVersion);
+        
+        // 清除缓存相关的存储
+        try {
+            // 清除可能与卡片渲染相关的缓存数据
+            if (caches && caches.delete) {
+                caches.delete('news-data-cache').then(() => {
+                    console.log('清除缓存成功');
+                }).catch(e => {
+                    console.error('清除缓存失败:', e);
+                });
+            }
+        } catch (e) {
+            console.error('缓存操作失败:', e);
+        }
+    }
+
     // 获取DOM元素
     const newsContainer = document.getElementById('news-container');
     const searchInput = document.getElementById('search-input');
@@ -141,8 +165,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
         
-        // 使用相对路径 API 端点
-        const apiUrl = '/api/articles';
+        // 使用完整的API URL
+        const apiUrl = 'https://crawl-beta.vercel.app/api/articles';
         
         fetch(apiUrl, {
             method: 'GET',
@@ -217,8 +241,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
         
-        // 使用相对路径API端点
-        const searchApiUrl = `/api/search?q=${encodeURIComponent(query)}`;
+        // 使用完整的API URL
+        const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}`;
         
         fetch(searchApiUrl, {
             method: 'GET',
