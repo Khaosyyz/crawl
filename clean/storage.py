@@ -49,6 +49,40 @@ class DataStorage:
         """
         return url in self._existing_urls
     
+    def store(self, article: Dict[str, Any]) -> bool:
+        """保存单篇文章到数据库
+        
+        Args:
+            article: 要保存的文章
+            
+        Returns:
+            是否成功保存
+        """
+        if not article:
+            logger.warning("尝试保存空文章")
+            return False
+            
+        url = article.get('source_url', '')
+        if not url:
+            logger.warning("文章缺少source_url字段")
+            return False
+            
+        # 检查URL是否已存在
+        if self.url_exists(url):
+            logger.info(f"跳过已存在的URL: {url}")
+            return False
+            
+        # 保存到MongoDB
+        try:
+            self.mongodb.insert_articles([article])
+            # 添加到已存在URL集合中
+            self._existing_urls.add(url)
+            logger.info(f"成功保存文章: {article.get('title', '无标题')} - {url}")
+            return True
+        except Exception as e:
+            logger.error(f"保存文章失败: {e}")
+            return False
+    
     def save_articles(self, articles: List[Dict[str, Any]]) -> int:
         """保存文章数据到MongoDB
         

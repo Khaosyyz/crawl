@@ -708,9 +708,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const content = news.content || '';
             const dateTime = news.date_time || '';
             let author = news.author || '';
-            let followersCount = news.followers_count || 0;
-            let favoriteCount = news.favorite_count || 0;
-            let retweetCount = news.retweet_count || 0;
+            
+            // 使用正确的字段名来获取统计数据
+            let followersCount = news.followers || news.followers_count || 0; // 兼容两种可能的字段名
+            let favoriteCount = news.likes || news.favorite_count || 0; // 兼容两种可能的字段名
+            let retweetCount = news.retweets || news.retweet_count || 0; // 兼容两种可能的字段名
             
             // 根据来源设置不同的样式并构建卡片
             if (source === 'x.com') {
