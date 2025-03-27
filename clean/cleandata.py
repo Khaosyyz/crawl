@@ -56,7 +56,7 @@ logger = logging.getLogger("cleandata")
 # 常量定义
 API_KEY = 'p9mtsT4ioDYm1'
 API_BASE_URL = 'https://ai.liaobots.work/v1'
-MODEL_NAME = 'gemini-2.0-flash-exp'  # 改为 gemini-2.0-flash-exp
+MODEL_NAME = 'gemini-2.5-pro-exp-03-25'  # 改为 gemini-2.5-pro-exp-03-25
 
 # 控制API请求频率的参数
 BATCH_SIZE = 10  # 每批处理的数据量
@@ -84,54 +84,69 @@ class SystemPrompts:
     @staticmethod
     def get_x_prompt() -> str:
         """获取处理X.com数据的系统提示词"""
-        return (
-            "你是一位专业的AI行业资讯分析整理师，请将X.com上的推文整理为标准的新闻格式。\n\n"
-            "如果内容与AI技术、人工智能应用或机器学习等领域无关，请直跳过该资讯，不返回任何内容。\"\n\n"
-            "如果内容与AI相关，请按以下格式返回清洗后的内容：\n\n"
-            "标题: [根据内容生成的标题，确保简洁明了并包含关键信息]\n"
-            "正文: [推文的主要内容，清晰简洁的行业新闻格式，移除冗余信息，保持专业性，如原始内容中包含 URL，请在正文中添加 URL 链接]\n"
-            "作者: [原作者名] (@[用户名])\n"
-            "粉丝数: [粉丝数值]\n"
-            "点赞数: [点赞数值]\n"
-            "转发数: [转发数值]\n"
-            "日期: [原文发布日期，格式为YYYY-MM-DD HH:MM]\n\n"
-            
-            "处理要求：\n"
-            "1. 必须严格按照以上字段顺序和格式返回\n"
-            "2. 标题必须提取或生成，不可为空\n"
-            "3. 正文必须经过整理，以专业新闻的语气呈现\n"
-            "4. 保留专有名词的英文原文\n"
-            "5. 英文和数字前后需加空格提高可读性\n"
-            "6. 所有返回必须是结构化的字段，便于JSON解析\n"
-            "7. 不在返回内容中添加额外说明或注释\n"
-            "8. 所有内容必须有明确边界，每个字段单独成行"
-        )
+        return """你是一位专业的AI行业资讯分析整理师，请将X.com上的推文整理为标准的新闻格式。
+
+第一步：必须先将所有内容（无论语言）完整翻译成中文，保持专业性和准确性。
+
+第二步：判断翻译后的内容是否与AI技术、人工智能应用、机器学习、深度学习、生成式AI、大模型等人工智能相关技术领域相关。只有高度相关的内容才会被处理。
+
+第三步：如果内容与AI相关，请按以下格式返回清洗后的内容：
+
+标题: [根据翻译后的内容自拟新闻标题，确保简洁明了(25字以内)且包含关键信息，突出公司名称、技术名称或产品名称，避免使用"关于"、"如何"等模糊词语]
+正文: [翻译后的内容，整理为清晰简洁的行业新闻格式，分段合理，删除冗余信息，如原始内容中包含URL链接，保留原始URL]
+作者: [原作者名] (@[用户名])
+粉丝数: [粉丝数值]
+点赞数: [点赞数值]
+转发数: [转发数值]
+日期: [原文发布日期，格式为YYYY-MM-DD HH:MM]
+
+处理要求：
+1. 无论内容多少，必须先完整翻译成中文再进行判断和处理
+2. 必须严格按照以上字段顺序和格式返回
+3. 标题必须自拟新闻标题，25字以内，简洁有力，突出技术产品或公司名称
+4. 正文必须是翻译后的中文内容，以专业新闻的语气呈现，保持原文的信息完整性
+5. 保留专有名词的中文翻译，重要的技术词汇保留英文原文标注，如"大型语言模型(Large Language Model, LLM)"
+6. 英文和数字前后需加空格提高可读性
+7. 对原文中的源链接URL保持原样，不要翻译或简化URL
+8. 所有返回必须是结构化的字段，便于JSON解析
+9. 如果翻译后判断内容与AI无关，则不返回任何内容
+10. 不在返回内容中添加额外说明或注释
+11. 所有内容必须有明确边界，每个字段单独成行
+12. 注意截断太长的内容，但必须保持句子和段落的完整性"""
     
     @staticmethod
     def get_crunchbase_prompt() -> str:
         """获取处理Crunchbase数据的系统提示词"""
-        return (
-            "你是一位专业的投资信息分析整理师，请将Crunchbase文章处理为标准的新闻格式。\n\n"
-            "请按以下格式返回清洗后的内容：\n\n"
-            "标题: [根据内容生成的标题，突出投资和融资信息]\n"
-            "正文: [完整翻译成中文的文章内容，分段清晰]\n"
-            "作者: [原作者姓名]\n"
-            "公司: [相关公司名称]\n"
-            "融资轮次: [轮次信息，如种子轮、A轮等]\n"
-            "融资金额: [融资金额]\n"
-            "投资方: [投资机构或个人]\n"
-            "日期: [原文发布日期，格式为YYYY-MM-DD]\n\n"
-            
-            "处理要求：\n"
-            "1. 必须严格按照以上字段顺序和格式返回\n"
-            "2. 标题必须生成，突出融资关键信息\n"
-            "3. 正文必须完全翻译成中文，保留专有名词\n"
-            "4. 英文和数字前后需加空格提高可读性\n"
-            "5. 所有返回必须是结构化的字段，便于JSON解析\n"
-            "6. 不在返回内容中添加额外说明或注释\n"
-            "7. 如原文没有提供某字段信息，请使用'未提供'填充\n"
-            "8. 所有内容必须有明确边界，每个字段单独成行"
-        )
+        return """你是一位专业的AI行业投资信息分析整理师，请将Crunchbase融资或投资文章处理为标准的新闻格式。
+
+第一步：必须先将所有内容（无论语言）完整翻译成中文，保持专业性和准确性。
+
+第二步：判断翻译后的内容是否与AI技术、人工智能公司、机器学习应用等相关。只有高度相关的内容才会被处理。
+
+第三步：请按以下格式返回清洗后的内容：
+
+标题: [格式为"公司名+融资金额+轮次"，例如"AI初创公司XXX完成1000万美元A轮融资"，确保简洁明了且符合新闻标题规范]
+正文: [翻译后的内容，整理为多段式新闻正文，第一段概述融资情况，后续段落介绍公司背景、技术、产品及用途，最后段落可提及投资方信息。确保段落分明，语句通顺，可读性高]
+作者: [原作者姓名，若无则填"未提供"]
+公司: [相关公司名称，必须准确提取]
+融资轮次: [轮次信息，如种子轮、A轮等，必须准确提取]
+融资金额: [融资金额，必须准确提取，包含货币单位]
+投资方: [投资机构或个人名称列表，必须准确提取]
+日期: [原文发布日期，格式为YYYY-MM-DD]
+
+处理要求：
+1. 无论内容多少，必须先完整翻译成中文再进行判断和处理
+2. 必须严格按照以上字段顺序和格式返回
+3. 标题必须按照"公司名+融资金额+轮次"模式，25字以内，具有新闻价值
+4. 正文必须采用专业新闻报道格式，分成3-5个段落，每段不超过3-4个句子
+5. 重要的公司名称、产品名称等专有名词需保留英文原文标注，如"人工智能公司DeepMind"
+6. 英文和数字前后需加空格提高可读性
+7. 务必准确提取融资轮次、融资金额和投资方信息，这些是关键数据
+8. 所有返回必须是结构化的字段，便于JSON解析
+9. 如果翻译后判断内容与AI行业投资无关，则不返回任何内容
+10. 不在返回内容中添加额外说明或注释
+11. 如原文确实没有提供某字段信息，请使用'未提供'填充
+12. 所有内容必须有明确边界，每个字段单独成行"""
     
     @staticmethod
     def get_default_prompt() -> str:
@@ -310,22 +325,16 @@ class XDataProcessor(DataProcessor):
                     logger.info(f"批处理完成，等待 {BATCH_INTERVAL} 秒后处理下一批...")
                     time.sleep(BATCH_INTERVAL)
             
-            # 处理完成后移动临时文件（备份）
+            # 处理完成后清空临时文件
             if processed_count > 0:
-                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                backup_path = os.path.join(DATA_DIR, f'x_tempdata_{timestamp}.json.bak')
-                
                 try:
-                    with open(backup_path, 'w', encoding='utf-8') as f:
-                        json.dump(temp_data, f, ensure_ascii=False, indent=2)
-                    
                     # 清空原始临时文件，但保留文件
                     with open(X_TEMP_DATA_PATH, 'w', encoding='utf-8') as f:
                         json.dump([], f)
                     
-                    logger.info(f"临时数据已备份至 {backup_path} 并清空原始文件")
+                    logger.info("临时数据已处理完毕，已清空原始文件")
                 except Exception as e:
-                    logger.error(f"备份临时数据出错: {e}")
+                    logger.error(f"清空临时数据出错: {e}")
             
             logger.info(f"X平台数据处理完成，处理 {processed_count} 条，成功存储 {stored_count} 条")
             return processed_count
@@ -339,12 +348,16 @@ class XDataProcessor(DataProcessor):
         """处理单条X平台数据"""
         try:
             # 准备输入文本
+            raw_data = item.get('raw', {})
+            author_name = raw_data.get('name', '')
+            author_username = raw_data.get('username', '')
+            
             input_text = (
-                f"推文内容: {item.get('content', '')}\n\n"
-                f"作者: {item.get('author_name', '')} (@{item.get('author_username', '')})\n"
-                f"粉丝数: {item.get('followers_count', 0)}\n"
-                f"点赞数: {item.get('likes_count', 0)}\n"
-                f"转发数: {item.get('retweets_count', 0)}\n"
+                f"推文内容: {item.get('text', '')}\n\n"
+                f"作者: {author_name} (@{author_username})\n"
+                f"粉丝数: {raw_data.get('followers_count', 0)}\n"
+                f"点赞数: {raw_data.get('favorite_count', 0)}\n"
+                f"转发数: {raw_data.get('retweet_count', 0)}\n"
                 f"发布时间: {item.get('date_time', '')}"
             )
             
@@ -393,26 +406,51 @@ class XDataProcessor(DataProcessor):
                     elif key == '日期':
                         parsed['date_time'] = value
             
-            # 验证必要字段
+            # 验证必要字段 - 如果缺少标题，则使用原始文本生成一个
             if 'title' not in parsed or not parsed['title']:
-                logger.warning("解析结果缺少标题字段，跳过")
-                return None
+                logger.warning("解析结果缺少标题字段，尝试生成标题")
+                # 使用原始文本的开头作为标题（最多50个字符）
+                raw_text = original_item.get('text', '').strip()
+                if raw_text:
+                    # 取前50个字符，确保不截断单词
+                    if len(raw_text) > 50:
+                        title_text = raw_text[:50].rsplit(' ', 1)[0] + '...'
+                    else:
+                        title_text = raw_text
+                    parsed['title'] = f"AI相关：{title_text}"
+                else:
+                    # 如果原始文本为空，使用通用标题
+                    parsed['title'] = "AI行业动态"
+                
+                logger.info(f"自动生成标题: {parsed['title']}")
             
+            # 如果内容为空，尝试使用原始文本
             if 'content' not in parsed or not parsed['content']:
-                logger.warning("解析结果缺少正文字段，跳过")
-                return None
+                logger.warning("解析结果缺少正文字段，使用原始文本")
+                raw_text = original_item.get('text', '')
+                if raw_text:
+                    parsed['content'] = TextUtils.standardize_punctuation(raw_text)
+                else:
+                    # 如果真的没有内容，跳过
+                    logger.warning("无法获取内容，跳过处理")
+                    return None
+            
+            # 使用原始数据中的作者信息
+            author_name = original_item.get('raw', {}).get('name', '')
+            author_username = original_item.get('raw', {}).get('username', '')
+            author_display = f"{author_name} (@{author_username})" if author_name and author_username else author_name or author_username
             
             # 构建最终结构化数据
             structured_data = {
                 'title': parsed.get('title', ''),
                 'content': parsed.get('content', ''),
-                'author': parsed.get('author', original_item.get('author_name', '')),
+                'author': parsed.get('author', author_display),
                 'date_time': parsed.get('date_time', original_item.get('date_time', '')),
                 'source': 'x.com',
-                'source_url': original_item.get('url', ''),
-                'likes': original_item.get('likes_count', 0),
-                'retweets': original_item.get('retweets_count', 0),
-                'followers': original_item.get('followers_count', 0),
+                'source_url': original_item.get('source_url', original_item.get('raw', {}).get('url', '')),
+                'likes': original_item.get('raw', {}).get('favorite_count', 0),
+                'retweets': original_item.get('raw', {}).get('retweet_count', 0),
+                'followers': original_item.get('raw', {}).get('followers_count', 0),
                 'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
@@ -474,22 +512,16 @@ class CrunchbaseDataProcessor(DataProcessor):
                     logger.info(f"批处理完成，等待 {BATCH_INTERVAL} 秒后处理下一批...")
                     time.sleep(BATCH_INTERVAL)
             
-            # 处理完成后移动临时文件（备份）
+            # 处理完成后清空临时文件
             if processed_count > 0:
-                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                backup_path = os.path.join(DATA_DIR, f'cru_tempdata_{timestamp}.json.bak')
-                
                 try:
-                    with open(backup_path, 'w', encoding='utf-8') as f:
-                        json.dump(temp_data, f, ensure_ascii=False, indent=2)
-                    
                     # 清空原始临时文件，但保留文件
                     with open(CRU_TEMP_DATA_PATH, 'w', encoding='utf-8') as f:
                         json.dump([], f)
                     
-                    logger.info(f"临时数据已备份至 {backup_path} 并清空原始文件")
+                    logger.info("临时数据已处理完毕，已清空原始文件")
                 except Exception as e:
-                    logger.error(f"备份临时数据出错: {e}")
+                    logger.error(f"清空临时数据出错: {e}")
             
             logger.info(f"Crunchbase数据处理完成，处理 {processed_count} 条，成功存储 {stored_count} 条")
             return processed_count
@@ -566,14 +598,40 @@ class CrunchbaseDataProcessor(DataProcessor):
                     elif key == '日期':
                         parsed['date_time'] = value
             
-            # 验证必要字段
+            # 验证必要字段 - 如果缺少标题，则尝试从原始数据生成
             if 'title' not in parsed or not parsed['title']:
-                logger.warning("解析结果缺少标题字段，跳过")
-                return None
+                logger.warning("解析结果缺少标题字段，尝试生成标题")
+                # 首先尝试使用原始文章标题
+                if original_item.get('title'):
+                    parsed['title'] = original_item.get('title')
+                # 否则使用原始文本的开头
+                else:
+                    raw_text = original_item.get('content', '').strip()
+                    if raw_text:
+                        # 取前50个字符，确保不截断单词
+                        if len(raw_text) > 50:
+                            title_text = raw_text[:50].rsplit(' ', 1)[0] + '...'
+                        else:
+                            title_text = raw_text
+                        parsed['title'] = f"投融资：{title_text}"
+                    else:
+                        # 如果原始文本为空，使用通用标题
+                        parsed['title'] = "Crunchbase投融资资讯"
+                
+                logger.info(f"自动生成标题: {parsed['title']}")
             
+            # 如果内容为空，尝试使用原始文本
             if 'content' not in parsed or not parsed['content']:
-                logger.warning("解析结果缺少正文字段，跳过")
-                return None
+                logger.warning("解析结果缺少正文字段，使用原始文本")
+                raw_text = original_item.get('content', '')
+                if raw_text:
+                    # 为原始内容应用特殊格式化
+                    parsed['content'] = TextUtils.format_crunchbase_content(raw_text)
+                    parsed['content'] = TextUtils.standardize_punctuation(parsed['content'])
+                else:
+                    # 如果真的没有内容，跳过
+                    logger.warning("无法获取内容，跳过处理")
+                    return None
             
             # 构建最终结构化数据
             structured_data = {
