@@ -601,6 +601,29 @@ footer {
     border-color: #e1e8ed;
 }
 
+/* 显示更多按钮样式 */
+.load-more-button {
+    display: block;
+    width: 200px;
+    margin: 20px auto;
+    padding: 10px 20px;
+    background-color: #1d9bf0;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.load-more-button:hover {
+    background-color: #1a8cd8;
+}
+
+.load-more-button:active {
+    transform: scale(0.98);
+}
+
 @media (max-width: 768px) {
     .pagination button {
         min-width: 36px;
@@ -609,27 +632,33 @@ footer {
     }
 }
 
-/* 显示更多按钮样式 */
-.load-more-button {
-    display: block;
-    width: 200px;
-    margin: 20px auto;
-    padding: 10px 20px;
-    background-color: #4a90e2;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.3s ease;
+/* 隐藏的新闻容器样式 */
+.hidden-news {
+    display: none;
+    margin-top: 20px;
 }
 
-.load-more-button:hover {
-    background-color: #357abd;
-}
-
-.load-more-button:active {
-    background-color: #2d6da3;
+/* 响应式布局调整 */
+@media (max-width: 768px) {
+    .date-header {
+        font-size: 1.1rem;
+        margin: 20px 0 10px;
+    }
+    
+    .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .pagination button {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+    
+    .expand-button button {
+        width: 100%;
+        max-width: 300px;
+    }
 }
 
 /* X.com 卡片的三段式结构样式 */

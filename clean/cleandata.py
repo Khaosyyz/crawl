@@ -56,7 +56,11 @@ logger = logging.getLogger("cleandata")
 # 常量定义
 API_KEY = 'p9mtsT4ioDYm1'
 API_BASE_URL = 'https://ai.liaobots.work/v1'
-MODEL_NAME = 'Gemini-2.5-Pro-Exp'
+MODEL_NAME = 'gemini-2.0-flash-exp'  # 改为 gemini-2.0-flash-exp
+
+# 控制API请求频率的参数
+BATCH_SIZE = 10  # 每批处理的数据量
+BATCH_INTERVAL = 20  # 批处理间隔（秒）
 
 # 初始化 OpenAI 客户端
 client = OpenAI(
@@ -248,194 +252,179 @@ class DataProcessor:
                         logger.warning(f"API连接错误 (尝试 {attempt}/{max_retries}): {str(e)}")
                     elif "rate limit" in str(e).lower():
                         logger.warning(f"API速率限制 (尝试 {attempt}/{max_retries}): {str(e)}")
-                        retry_delay = max(retry_delay * 2, 10.0)
                     else:
                         logger.warning(f"API调用失败 (尝试 {attempt}/{max_retries}): {str(e)}")
-                    
+                    # 增加错误重试延迟
+                    logger.info(f"等待 {retry_delay:.1f} 秒后重试...")
                     time.sleep(retry_delay)
                 else:
                     logger.error(f"API调用最终失败: {str(e)}")
                     return ""
         
         return ""
-    
-    def close(self):
-        """关闭资源"""
-        self.storage.close()
 
 
 class XDataProcessor(DataProcessor):
-    """X.com数据处理器"""
+    """X平台数据处理器"""
     
     def process(self) -> int:
-        """处理X.com数据"""
+        """处理X数据"""
+        logger.info("开始处理X平台数据")
+        
+        # 检查临时文件是否存在
+        if not os.path.exists(X_TEMP_DATA_PATH):
+            logger.info("未找到X平台临时数据文件")
+            return 0
+        
+        # 读取临时数据
         try:
-            # 加载临时数据
-            raw_data = self.storage.load_temp_data(X_TEMP_DATA_PATH)
-            if not raw_data:
-                logger.info("没有X.com数据需要处理")
+            with open(X_TEMP_DATA_PATH, 'r', encoding='utf-8') as f:
+                temp_data = json.load(f)
+            
+            if not temp_data:
+                logger.info("X平台临时数据为空")
                 return 0
             
-            # 获取系统提示词
-            system_prompt = SystemPrompts.get_x_prompt()
+            logger.info(f"读取到 {len(temp_data)} 条X平台原始数据")
             
-            # 处理数据
-            processed_data = []
-            for item in raw_data:
+            # 批量处理数据，每批处理 BATCH_SIZE 条
+            processed_count = 0
+            stored_count = 0
+            
+            # 添加批处理和间隔逻辑
+            for i in range(0, len(temp_data), BATCH_SIZE):
+                batch = temp_data[i:i+BATCH_SIZE]
+                logger.info(f"处理批次 {i//BATCH_SIZE + 1}/{(len(temp_data)-1)//BATCH_SIZE + 1}，共 {len(batch)} 条数据")
+                
+                # 处理当前批次
+                for item in batch:
+                    processed_item = self._process_x_item(item)
+                    if processed_item:
+                        # 存储处理后的数据
+                        if self.storage.store(processed_item):
+                            stored_count += 1
+                        processed_count += 1
+                
+                # 如果不是最后一批，等待一段时间再处理下一批
+                if i + BATCH_SIZE < len(temp_data):
+                    logger.info(f"批处理完成，等待 {BATCH_INTERVAL} 秒后处理下一批...")
+                    time.sleep(BATCH_INTERVAL)
+            
+            # 处理完成后移动临时文件（备份）
+            if processed_count > 0:
+                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                backup_path = os.path.join(DATA_DIR, f'x_tempdata_{timestamp}.json.bak')
+                
                 try:
-                    # 准备提示词
-                    prompt = json.dumps(item, ensure_ascii=False)
+                    with open(backup_path, 'w', encoding='utf-8') as f:
+                        json.dump(temp_data, f, ensure_ascii=False, indent=2)
                     
-                    # 调用AI处理
-                    result = self._call_ai_api(system_prompt, prompt)
-                    if not result:
-                        continue
+                    # 清空原始临时文件，但保留文件
+                    with open(X_TEMP_DATA_PATH, 'w', encoding='utf-8') as f:
+                        json.dump([], f)
                     
-                    # 检查是否是"跳过"响应
-                    if "这条资讯与AI无关，跳过" in result:
-                        logger.info("资讯与AI无关，跳过处理")
-                        continue
-                    
-                    # 从AI返回结果中提取结构化数据
-                    article = self._parse_ai_response(result, item)
-                    
-                    # 确保article不为None
-                    if article:
-                        processed_data.append(article)
-                    
+                    logger.info(f"临时数据已备份至 {backup_path} 并清空原始文件")
                 except Exception as e:
-                    logger.error(f"处理X.com数据项失败: {str(e)}")
-                    continue
+                    logger.error(f"备份临时数据出错: {e}")
             
-            # 保存处理后的数据
-            saved_count = self.storage.save_articles(processed_data)
+            logger.info(f"X平台数据处理完成，处理 {processed_count} 条，成功存储 {stored_count} 条")
+            return processed_count
             
-            # 清空临时文件
-            self.storage.clear_temp_file(X_TEMP_DATA_PATH)
-            
-            return saved_count
         except Exception as e:
-            logger.error(f"X.com数据处理失败: {str(e)}")
+            logger.error(f"处理X平台数据出错: {e}")
+            logger.error(traceback.format_exc())
             return 0
     
-    def _parse_ai_response(self, response: str, original_item: Dict) -> Optional[Dict]:
-        """从AI响应中解析结构化数据
-        
-        Args:
-            response: AI返回的文本
-            original_item: 原始数据项
-            
-        Returns:
-            结构化的文章数据，解析失败则返回None
-        """
+    def _process_x_item(self, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """处理单条X平台数据"""
         try:
-            # 初始化文章数据
-            article = {
-                "title": "",
-                "content": "",
-                "source": "x.com",
-                "source_url": original_item.get("source_url", ""),
-                "date_time": original_item.get("date_time", ""),
-                "author": "",
-                "followers_count": 0,
-                "favorite_count": 0,
-                "retweet_count": 0,
-                "raw": original_item
-            }
+            # 准备输入文本
+            input_text = (
+                f"推文内容: {item.get('content', '')}\n\n"
+                f"作者: {item.get('author_name', '')} (@{item.get('author_username', '')})\n"
+                f"粉丝数: {item.get('followers_count', 0)}\n"
+                f"点赞数: {item.get('likes_count', 0)}\n"
+                f"转发数: {item.get('retweets_count', 0)}\n"
+                f"发布时间: {item.get('date_time', '')}"
+            )
             
-            # 解析AI返回的结构化内容
-            lines = response.strip().split('\n')
-            current_field = None
-            field_content = []
+            # 获取系统提示词
+            system_prompt = SystemPrompts.get_for_source("x.com")
             
+            # 调用AI处理
+            result = self._call_ai_api(system_prompt, input_text)
+            
+            # 如果结果为空，可能是非AI相关内容，跳过
+            if not result or len(result.strip()) < 10:
+                logger.info("内容可能不相关或处理结果为空，跳过")
+                return None
+            
+            # 解析处理结果
+            return self._parse_x_result(result, item)
+            
+        except Exception as e:
+            logger.error(f"处理X数据项出错: {e}")
+            logger.error(traceback.format_exc())
+            return None
+    
+    def _parse_x_result(self, result: str, original_item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """解析AI处理后的X平台结果"""
+        try:
+            lines = result.split('\n')
+            parsed = {}
+            
+            # 提取字段
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
                 
-                # 检查是否是字段标识行
-                if ":" in line and len(line.split(":", 1)[0]) < 20:
-                    # 如果已有当前字段，先保存
-                    if current_field and field_content:
-                        field_value = '\n'.join(field_content).strip()
-                        if current_field == "标题":
-                            article["title"] = field_value
-                        elif current_field == "正文":
-                            article["content"] = field_value
-                        elif current_field == "作者":
-                            article["author"] = field_value
-                        elif current_field == "粉丝数":
-                            try:
-                                article["followers_count"] = int(field_value.replace(',', ''))
-                            except:
-                                pass
-                        elif current_field == "点赞数":
-                            try:
-                                article["favorite_count"] = int(field_value.replace(',', ''))
-                            except:
-                                pass
-                        elif current_field == "转发数":
-                            try:
-                                article["retweet_count"] = int(field_value.replace(',', ''))
-                            except:
-                                pass
-                        elif current_field == "日期":
-                            article["date_time"] = field_value
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip()
+                    value = value.strip()
                     
-                    # 设置新的当前字段
-                    field_parts = line.split(":", 1)
-                    current_field = field_parts[0].strip()
-                    field_content = [field_parts[1].strip()] if len(field_parts) > 1 else []
-                else:
-                    # 继续添加到当前字段
-                    if current_field:
-                        field_content.append(line)
+                    if key == '标题':
+                        parsed['title'] = value
+                    elif key == '正文':
+                        parsed['content'] = TextUtils.standardize_punctuation(value)
+                    elif key == '作者':
+                        parsed['author'] = value
+                    elif key == '日期':
+                        parsed['date_time'] = value
             
-            # 处理最后一个字段
-            if current_field and field_content:
-                field_value = '\n'.join(field_content).strip()
-                if current_field == "标题":
-                    article["title"] = field_value
-                elif current_field == "正文":
-                    article["content"] = field_value
-                elif current_field == "作者":
-                    article["author"] = field_value
-                elif current_field == "粉丝数":
-                    try:
-                        article["followers_count"] = int(field_value.replace(',', ''))
-                    except:
-                        pass
-                elif current_field == "点赞数":
-                    try:
-                        article["favorite_count"] = int(field_value.replace(',', ''))
-                    except:
-                        pass
-                elif current_field == "转发数":
-                    try:
-                        article["retweet_count"] = int(field_value.replace(',', ''))
-                    except:
-                        pass
-                elif current_field == "日期":
-                    article["date_time"] = field_value
+            # 验证必要字段
+            if 'title' not in parsed or not parsed['title']:
+                logger.warning("解析结果缺少标题字段，跳过")
+                return None
             
-            # 整理文章格式，确保文章结构完整
-            # 如果标题为空，从内容提取或生成一个
-            if not article["title"] and article["content"]:
-                first_line = article["content"].split('\n', 1)[0]
-                if len(first_line) < 100:
-                    article["title"] = first_line
-                else:
-                    article["title"] = first_line[:100] + "..."
+            if 'content' not in parsed or not parsed['content']:
+                logger.warning("解析结果缺少正文字段，跳过")
+                return None
             
-            # 确保内容不为空
-            if not article["content"]:
-                logger.warning("解析后的文章内容为空，使用原始文本")
-                article["content"] = response
+            # 构建最终结构化数据
+            structured_data = {
+                'title': parsed.get('title', ''),
+                'content': parsed.get('content', ''),
+                'author': parsed.get('author', original_item.get('author_name', '')),
+                'date_time': parsed.get('date_time', original_item.get('date_time', '')),
+                'source': 'x.com',
+                'source_url': original_item.get('url', ''),
+                'likes': original_item.get('likes_count', 0),
+                'retweets': original_item.get('retweets_count', 0),
+                'followers': original_item.get('followers_count', 0),
+                'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
             
-            return article
+            # 生成唯一ID
+            id_text = f"{structured_data['source']}_{structured_data['source_url']}"
+            structured_data['id'] = generate_id(id_text)
+            
+            return structured_data
             
         except Exception as e:
-            logger.error(f"解析AI响应失败: {str(e)}")
+            logger.error(f"解析X处理结果出错: {e}")
+            logger.error(traceback.format_exc())
             return None
 
 
@@ -444,183 +433,227 @@ class CrunchbaseDataProcessor(DataProcessor):
     
     def process(self) -> int:
         """处理Crunchbase数据"""
+        logger.info("开始处理Crunchbase数据")
+        
+        # 检查临时文件是否存在
+        if not os.path.exists(CRU_TEMP_DATA_PATH):
+            logger.info("未找到Crunchbase临时数据文件")
+            return 0
+        
+        # 读取临时数据
         try:
-            # 加载临时数据
-            raw_data = self.storage.load_temp_data(CRU_TEMP_DATA_PATH)
-            if not raw_data:
-                logger.info("没有Crunchbase数据需要处理")
+            with open(CRU_TEMP_DATA_PATH, 'r', encoding='utf-8') as f:
+                temp_data = json.load(f)
+            
+            if not temp_data:
+                logger.info("Crunchbase临时数据为空")
                 return 0
             
-            # 获取系统提示词
-            system_prompt = SystemPrompts.get_crunchbase_prompt()
+            logger.info(f"读取到 {len(temp_data)} 条Crunchbase原始数据")
             
-            # 处理数据
-            processed_data = []
-            for item in raw_data:
+            # 批量处理数据
+            processed_count = 0
+            stored_count = 0
+            
+            # 添加批处理和间隔逻辑
+            for i in range(0, len(temp_data), BATCH_SIZE):
+                batch = temp_data[i:i+BATCH_SIZE]
+                logger.info(f"处理批次 {i//BATCH_SIZE + 1}/{(len(temp_data)-1)//BATCH_SIZE + 1}，共 {len(batch)} 条数据")
+                
+                # 处理当前批次
+                for item in batch:
+                    processed_item = self._process_crunchbase_item(item)
+                    if processed_item:
+                        # 存储处理后的数据
+                        if self.storage.store(processed_item):
+                            stored_count += 1
+                        processed_count += 1
+                
+                # 如果不是最后一批，等待一段时间再处理下一批
+                if i + BATCH_SIZE < len(temp_data):
+                    logger.info(f"批处理完成，等待 {BATCH_INTERVAL} 秒后处理下一批...")
+                    time.sleep(BATCH_INTERVAL)
+            
+            # 处理完成后移动临时文件（备份）
+            if processed_count > 0:
+                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                backup_path = os.path.join(DATA_DIR, f'cru_tempdata_{timestamp}.json.bak')
+                
                 try:
-                    # 准备提示词
-                    prompt = json.dumps(item, ensure_ascii=False)
+                    with open(backup_path, 'w', encoding='utf-8') as f:
+                        json.dump(temp_data, f, ensure_ascii=False, indent=2)
                     
-                    # 调用AI处理
-                    result = self._call_ai_api(system_prompt, prompt)
-                    if not result:
-                        continue
+                    # 清空原始临时文件，但保留文件
+                    with open(CRU_TEMP_DATA_PATH, 'w', encoding='utf-8') as f:
+                        json.dump([], f)
                     
-                    # 从AI返回结果中提取结构化数据
-                    article = self._parse_ai_response(result, item)
-                    
-                    # 确保article不为None
-                    if article:
-                        processed_data.append(article)
-                    
+                    logger.info(f"临时数据已备份至 {backup_path} 并清空原始文件")
                 except Exception as e:
-                    logger.error(f"处理Crunchbase数据项失败: {str(e)}")
-                    continue
+                    logger.error(f"备份临时数据出错: {e}")
             
-            # 保存处理后的数据
-            saved_count = self.storage.save_articles(processed_data)
+            logger.info(f"Crunchbase数据处理完成，处理 {processed_count} 条，成功存储 {stored_count} 条")
+            return processed_count
             
-            # 清空临时文件
-            self.storage.clear_temp_file(CRU_TEMP_DATA_PATH)
-            
-            return saved_count
         except Exception as e:
-            logger.error(f"Crunchbase数据处理失败: {str(e)}")
+            logger.error(f"处理Crunchbase数据出错: {e}")
+            logger.error(traceback.format_exc())
             return 0
     
-    def _parse_ai_response(self, response: str, original_item: Dict) -> Optional[Dict]:
-        """从AI响应中解析结构化数据
-        
-        Args:
-            response: AI返回的文本
-            original_item: 原始数据项
-            
-        Returns:
-            结构化的文章数据，解析失败则返回None
-        """
+    def _process_crunchbase_item(self, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """处理单条Crunchbase数据"""
         try:
-            # 初始化文章数据
-            article = {
-                "title": "",
-                "content": "",
-                "source": "crunchbase.com",
-                "source_url": original_item.get("source_url", ""),
-                "date_time": original_item.get("date_time", ""),
-                "author": "",
-                "company": "",
-                "funding_round": "",
-                "funding_amount": "",
-                "investors": "",
-                "raw": original_item
-            }
+            # 准备输入文本
+            input_text = (
+                f"文章标题: {item.get('title', '')}\n\n"
+                f"文章内容: {item.get('content', '')}\n\n"
+                f"作者: {item.get('author', '')}\n"
+                f"发布时间: {item.get('date_time', '')}\n"
+                f"URL: {item.get('url', '')}"
+            )
             
-            # 解析AI返回的结构化内容
-            lines = response.strip().split('\n')
-            current_field = None
-            field_content = []
+            # 获取系统提示词
+            system_prompt = SystemPrompts.get_for_source("crunchbase.com")
             
+            # 调用AI处理
+            result = self._call_ai_api(system_prompt, input_text)
+            
+            # 如果结果为空，跳过
+            if not result or len(result.strip()) < 10:
+                logger.info("处理结果为空，跳过")
+                return None
+            
+            # 解析处理结果
+            return self._parse_crunchbase_result(result, item)
+            
+        except Exception as e:
+            logger.error(f"处理Crunchbase数据项出错: {e}")
+            logger.error(traceback.format_exc())
+            return None
+    
+    def _parse_crunchbase_result(self, result: str, original_item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """解析AI处理后的Crunchbase结果"""
+        try:
+            lines = result.split('\n')
+            parsed = {}
+            
+            # 提取字段
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
                 
-                # 检查是否是字段标识行
-                if ":" in line and len(line.split(":", 1)[0]) < 20:
-                    # 如果已有当前字段，先保存
-                    if current_field and field_content:
-                        field_value = '\n'.join(field_content).strip()
-                        if current_field == "标题":
-                            article["title"] = field_value
-                        elif current_field == "正文":
-                            article["content"] = field_value
-                        elif current_field == "作者":
-                            article["author"] = field_value
-                        elif current_field == "公司":
-                            article["company"] = field_value
-                        elif current_field == "融资轮次":
-                            article["funding_round"] = field_value
-                        elif current_field == "融资金额":
-                            article["funding_amount"] = field_value
-                        elif current_field == "投资方":
-                            article["investors"] = field_value
-                        elif current_field == "日期":
-                            article["date_time"] = field_value
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip()
+                    value = value.strip()
                     
-                    # 设置新的当前字段
-                    field_parts = line.split(":", 1)
-                    current_field = field_parts[0].strip()
-                    field_content = [field_parts[1].strip()] if len(field_parts) > 1 else []
-                else:
-                    # 继续添加到当前字段
-                    if current_field:
-                        field_content.append(line)
+                    if key == '标题':
+                        parsed['title'] = value
+                    elif key == '正文':
+                        # 为Crunchbase内容应用特殊格式化
+                        parsed['content'] = TextUtils.format_crunchbase_content(value)
+                        parsed['content'] = TextUtils.standardize_punctuation(parsed['content'])
+                    elif key == '作者':
+                        parsed['author'] = value
+                    elif key == '公司':
+                        parsed['company'] = value
+                    elif key == '融资轮次':
+                        parsed['funding_round'] = value
+                    elif key == '融资金额':
+                        parsed['funding_amount'] = value
+                    elif key == '投资方':
+                        parsed['investors'] = value
+                    elif key == '日期':
+                        parsed['date_time'] = value
             
-            # 处理最后一个字段
-            if current_field and field_content:
-                field_value = '\n'.join(field_content).strip()
-                if current_field == "标题":
-                    article["title"] = field_value
-                elif current_field == "正文":
-                    article["content"] = field_value
-                elif current_field == "作者":
-                    article["author"] = field_value
-                elif current_field == "公司":
-                    article["company"] = field_value
-                elif current_field == "融资轮次":
-                    article["funding_round"] = field_value
-                elif current_field == "融资金额":
-                    article["funding_amount"] = field_value
-                elif current_field == "投资方":
-                    article["investors"] = field_value
-                elif current_field == "日期":
-                    article["date_time"] = field_value
+            # 验证必要字段
+            if 'title' not in parsed or not parsed['title']:
+                logger.warning("解析结果缺少标题字段，跳过")
+                return None
             
-            # 整理文章格式，确保文章结构完整
-            # 如果标题为空，从内容提取或生成一个
-            if not article["title"] and article["content"]:
-                first_line = article["content"].split('\n', 1)[0]
-                if len(first_line) < 100:
-                    article["title"] = first_line
-                else:
-                    article["title"] = first_line[:100] + "..."
+            if 'content' not in parsed or not parsed['content']:
+                logger.warning("解析结果缺少正文字段，跳过")
+                return None
             
-            # 确保内容不为空
-            if not article["content"]:
-                logger.warning("解析后的文章内容为空，使用原始文本")
-                article["content"] = response
+            # 构建最终结构化数据
+            structured_data = {
+                'title': parsed.get('title', ''),
+                'content': parsed.get('content', ''),
+                'author': parsed.get('author', original_item.get('author', '')),
+                'date_time': parsed.get('date_time', original_item.get('date_time', '')),
+                'source': 'crunchbase.com',
+                'source_url': original_item.get('url', ''),
+                'company': parsed.get('company', '未提供'),
+                'funding_round': parsed.get('funding_round', '未提供'),
+                'funding_amount': parsed.get('funding_amount', '未提供'),
+                'investors': parsed.get('investors', '未提供'),
+                'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
             
-            return article
+            # 生成唯一ID
+            id_text = f"{structured_data['source']}_{structured_data['source_url']}"
+            structured_data['id'] = generate_id(id_text)
+            
+            return structured_data
             
         except Exception as e:
-            logger.error(f"解析AI响应失败: {str(e)}")
+            logger.error(f"解析Crunchbase处理结果出错: {e}")
+            logger.error(traceback.format_exc())
             return None
 
 
-def process_all_data() -> bool:
-    """处理所有数据源的数据"""
-    success = True
-    processors = [
-        XDataProcessor(),
-        CrunchbaseDataProcessor()
-    ]
+# 信号处理
+def handle_signal(signum, frame):
+    """处理信号"""
+    if signum == signal.SIGUSR1:
+        logger.info("收到 SIGUSR1 信号，立即检查数据")
+        process_data()
+    elif signum == signal.SIGTERM or signum == signal.SIGINT:
+        logger.info(f"收到信号 {signum}，准备退出")
+        sys.exit(0)
+
+
+# 数据处理主函数
+def process_data():
+    """处理数据的主函数"""
+    logger.info("开始检查临时数据...")
+    total_processed = 0
     
+    # 处理X平台数据
+    x_processor = XDataProcessor()
     try:
-        for processor in processors:
-            try:
-                count = processor.process()
-                logger.info(f"处理器 {processor.__class__.__name__} 完成，保存了 {count} 条数据")
-            except Exception as e:
-                logger.error(f"处理器 {processor.__class__.__name__} 失败: {str(e)}")
-                success = False
-            finally:
-                processor.close()
+        x_processed = x_processor.process()
+        total_processed += x_processed
+        logger.info(f"X平台数据处理完成，共处理 {x_processed} 条")
     except Exception as e:
-        logger.error(f"处理数据时发生错误: {str(e)}")
-        success = False
+        logger.error(f"X平台数据处理失败: {e}")
     
-    return success
+    # 处理Crunchbase数据
+    cru_processor = CrunchbaseDataProcessor()
+    try:
+        cru_processed = cru_processor.process()
+        total_processed += cru_processed
+        logger.info(f"Crunchbase数据处理完成，共处理 {cru_processed} 条")
+    except Exception as e:
+        logger.error(f"Crunchbase数据处理失败: {e}")
+    
+    logger.info(f"处理完成，共处理 {total_processed} 条数据")
+    return total_processed
 
 
 if __name__ == "__main__":
-    success = process_all_data()
-    sys.exit(0 if success else 1)
+    # 注册信号处理器
+    if platform.system() != "Windows":  # Windows不支持SIGUSR1
+        signal.signal(signal.SIGUSR1, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+    
+    logger.info("开始执行数据处理")
+    
+    # 设置循环间隔，单位为秒
+    interval = 7200  # 2小时
+    
+    while True:
+        processed = process_data()
+        logger.info(f"等待 {interval} 秒后再次检查...")
+        time.sleep(interval)

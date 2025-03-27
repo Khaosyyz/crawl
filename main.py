@@ -14,6 +14,8 @@ import glob
 from datetime import datetime
 import logging
 import socket
+import importlib.util
+import traceback
 
 # 设置日志记录 - 修改为只记录错误和警告信息
 logging.basicConfig(
@@ -270,8 +272,8 @@ def start_cleaner_service():
 import os
 import sys
 import time
-import subprocess
 import logging
+import importlib.util
 
 # 设置日志记录
 logging.basicConfig(
@@ -292,22 +294,24 @@ def main():
     logger.info("清洗服务循环启动")
     
     try:
+        # 动态导入清洗模块
+        spec = importlib.util.spec_from_file_location("cleandata", CLEANER_SCRIPT)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"无法加载清洗脚本: {CLEANER_SCRIPT}")
+            
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
         while True:
             logger.info("启动清洗服务...")
             
-            # 运行清洗服务
-            process = subprocess.run(
-                [sys.executable, CLEANER_SCRIPT],
-                capture_output=True,
-                text=True
-            )
-            
-            # 记录执行结果
-            if process.returncode == 0:
+            try:
+                # 直接调用清洗模块的process_data函数
+                module.process_data()
                 logger.info("清洗服务执行完成，等待下一次执行")
-            else:
-                logger.error(f"清洗服务执行失败，返回码: {process.returncode}")
-                logger.error(f"错误输出: {process.stderr}")
+            except Exception as e:
+                logger.error(f"清洗服务执行失败: {e}")
+                logger.error(traceback.format_exc())
             
             # 等待一段时间再次执行
             wait_time = 60  # 1分钟

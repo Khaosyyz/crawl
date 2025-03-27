@@ -197,15 +197,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     showError(result.message);
                     return;
                 }
-
-                // 保存所有数据
-                allNewsData = result.data || [];
                 
                 // 更新总页数
-                totalPages = result.total_date_pages || 1;
+                totalPages = result.total_date_pages;
                 
-                // 显示数据
-                displayCurrentPageNews();
+                // 更新数据
+                allNewsData = result.data;
+                
+                // 处理并显示数据
+                processAndDisplayNews(allNewsData);
                 
                 // 更新分页控件
                 updatePagination();
@@ -220,8 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     refreshButton.classList.remove('disabled');
                 }
                 
-                console.error('获取数据失败:', error);
-                showError('获取资讯数据失败，请稍后再试');
+                showError(`获取数据失败: ${error.message}`);
             });
     }
 
@@ -342,9 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
             crunchbaseNews = newsData;
             displayCrunchbaseNews();
         } else {
-            // 其他来源使用原有的分页逻辑
-            groupedNewsByDate = groupNewsByDate(newsData);
-            dateKeys = Object.keys(groupedNewsByDate).sort().reverse();
+            // 其他来源使用日期分组显示
             displayCurrentPageNews(isSearchResult);
         }
     }
@@ -525,60 +522,32 @@ document.addEventListener('DOMContentLoaded', function() {
             groupContainer.className = 'news-group';
             groupContainer.dataset.date = date;
         
-            // 是否需要"展开更多"按钮
-            const needsExpansion = dateGroup.length > DEFAULT_NEWS_PER_DATE;
-        
-            // 添加初始可见的新闻
-            const initialItems = dateGroup.slice(0, DEFAULT_NEWS_PER_DATE);
-            initialItems.forEach(news => {
+            // 初始只显示前9条新闻
+            const initialNews = dateGroup.slice(0, 9);
+            initialNews.forEach(news => {
                 const newsCard = createNewsCard(news);
                 groupContainer.appendChild(newsCard);
             });
         
             newsContainer.appendChild(groupContainer);
-        
-            // 如果有更多新闻，添加展开按钮和隐藏的新闻容器
-            if (needsExpansion) {
-                // 创建隐藏的容器用于存放额外的新闻
-                const hiddenContainer = document.createElement('div');
-                hiddenContainer.className = 'news-group hidden-news';
-                hiddenContainer.id = `hidden-news-${date.replace(/[^a-zA-Z0-9]/g, '-')}`;
-                hiddenContainer.style.display = 'none';
-        
-                // 添加剩余的新闻
-                const hiddenItems = dateGroup.slice(DEFAULT_NEWS_PER_DATE);
-                hiddenItems.forEach(news => {
-                    const newsCard = createNewsCard(news);
-                    hiddenContainer.appendChild(newsCard);
-                });
-        
-                newsContainer.appendChild(hiddenContainer);
-        
-                // 创建"展开更多"按钮
-                const expandButton = document.createElement('div');
-                expandButton.className = 'expand-button';
-                expandButton.innerHTML = `<button>展开更多 (${hiddenItems.length})</button>`;
-                expandButton.dataset.date = date;
-                expandButton.dataset.expanded = 'false';
-        
-                // 添加点击事件
-                expandButton.addEventListener('click', function() {
-                    const dateKey = this.dataset.date;
-                    const hiddenNewsId = `hidden-news-${dateKey.replace(/[^a-zA-Z0-9]/g, '-')}`;
-                    const hiddenNews = document.getElementById(hiddenNewsId);
-        
-                    if (this.dataset.expanded === 'false') {
-                        hiddenNews.style.display = 'grid';
-                        this.querySelector('button').textContent = '收起';
-                        this.dataset.expanded = 'true';
-                    } else {
-                        hiddenNews.style.display = 'none';
-                        this.querySelector('button').textContent = `展开更多 (${hiddenItems.length})`;
-                        this.dataset.expanded = 'false';
-                    }
-                });
-        
-                newsContainer.appendChild(expandButton);
+
+            // 如果该日期组有超过9条新闻，添加"显示更多"按钮
+            if (dateGroup.length > 9) {
+                const loadMoreButton = document.createElement('button');
+                loadMoreButton.className = 'load-more-button';
+                loadMoreButton.textContent = '显示更多';
+                loadMoreButton.dataset.date = date;
+                loadMoreButton.onclick = () => {
+                    // 移除"显示更多"按钮
+                    loadMoreButton.remove();
+                    // 显示剩余的新闻
+                    const remainingNews = dateGroup.slice(9);
+                    remainingNews.forEach(news => {
+                        const newsCard = createNewsCard(news);
+                        groupContainer.appendChild(newsCard);
+                    });
+                };
+                newsContainer.appendChild(loadMoreButton);
             }
         });
     }
