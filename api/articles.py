@@ -197,8 +197,28 @@ class Handler(BaseHTTPRequestHandler):
                                 'pagination_mode': 'date_grouped',
                                 'dates_in_page': current_page_dates,
                                 'date_articles': date_articles,
-                                'data': self._serialize_articles(all_articles)
+                                'data': self._serialize_articles(all_articles),
+                                # 添加明确的分页标志，兼容前端
+                                'has_more': any(info.get('has_more', False) for info in date_articles.values()),
+                                'total_pages': max([info.get('total_pages', 1) for info in date_articles.values()], default=1)
                             }
+                            
+                            # 如果只有一个日期且在第一页，为了兼容前端，确保分页标志正确
+                            if len(unique_dates) == 1 and date_page == 1:
+                                # 获取唯一的日期
+                                single_date = current_page_dates[0]
+                                # 获取该日期的分页信息
+                                date_info = date_articles.get(single_date, {})
+                                
+                                # 确保总页数和是否有更多标志正确
+                                response_data['total_pages'] = date_info.get('total_pages', 1)
+                                response_data['has_more'] = date_info.get('has_more', False)
+                                
+                                # 添加明确的"显示更多"信息
+                                if page < date_info.get('total_pages', 1):
+                                    response_data['show_more'] = True
+                                else:
+                                    response_data['show_more'] = False
                 
                 # 检查是否是 JSONP 请求
                 if '?callback=' in self.path:
@@ -260,8 +280,10 @@ class Handler(BaseHTTPRequestHandler):
                     date_only = date_str.split(' ')[0] if ' ' in date_str else date_str
                     unique_dates.add(date_only)
             
+            # 确保日期按从新到旧排序
             return sorted(list(unique_dates), reverse=True)
-        except:
+        except Exception as e:
+            print(f"获取唯一日期失败: {str(e)}")
             return []
     
     def _serialize_articles(self, articles):

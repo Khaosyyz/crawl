@@ -57,6 +57,9 @@ try:
             print(f"当前日期页: {response.get('date_page')}")
             print(f"总日期页数: {response.get('total_date_pages')}")
             print(f"当前页内日期: {response.get('dates_in_page')}")
+            print(f"全局是否有更多: {response.get('has_more')}")
+            print(f"全局总页数: {response.get('total_pages')}")
+            print(f"显示更多按钮: {response.get('show_more', False)}")
             
             # 打印每个日期的文章分页信息
             for date, date_info in response.get('date_articles', {}).items():
