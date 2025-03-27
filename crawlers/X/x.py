@@ -19,7 +19,7 @@ BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 # AI API 相关配置
 API_KEY = 'p9mtsT4ioDYm1'
 API_BASE_URL = 'https://ai.liaobots.work/v1'
-MODEL_NAME = 'grok-3'
+MODEL_NAME = 'Gemini-2.5-Pro-Exp'
 
 # 初始化 OpenAI 客户端
 client = OpenAI(
@@ -31,9 +31,6 @@ client = OpenAI(
 X_DIR = os.path.dirname(os.path.abspath(__file__))
 if not os.path.exists(X_DIR):
     os.makedirs(X_DIR)
-
-# 无效账号文件路径
-INVALID_ACCOUNTS_FILE = os.path.join(X_DIR, "x_invalid_account.txt")
 
 # 多账号配置
 ACCOUNTS = [
@@ -49,22 +46,24 @@ ACCOUNTS = [
     },
 ]
 
+# 保留无效账号处理相关的函数
 def load_invalid_accounts():
     """加载已知的无效账号列表"""
     invalid_accounts = set()
-    if os.path.exists(INVALID_ACCOUNTS_FILE):
-        with open(INVALID_ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
+    # 无效账号文件路径
+    invalid_accounts_file = os.path.join(X_DIR, "x_invalid_account.txt")
+    if os.path.exists(invalid_accounts_file):
+        with open(invalid_accounts_file, 'r', encoding='utf-8') as f:
             for line in f:
                 invalid_accounts.add(line.strip())
     return invalid_accounts
 
-
 def mark_account_as_invalid(username):
     """将账号标记为无效"""
-    with open(INVALID_ACCOUNTS_FILE, 'a', encoding='utf-8') as f:
+    invalid_accounts_file = os.path.join(X_DIR, "x_invalid_account.txt")
+    with open(invalid_accounts_file, 'a', encoding='utf-8') as f:
         f.write(f"{username}\n")
     print(f"账号 {username} 已被标记为无效，将从可用账号列表中移除")
-
 
 def get_valid_accounts():
     """获取有效的账号列表，排除已知的无效账号"""
@@ -74,49 +73,16 @@ def get_valid_accounts():
     if not valid_accounts:
         print("警告: 所有账号均已标记为无效，将重置无效账号列表")
         # 如果所有账号都无效，则清空无效账号列表，重新尝试所有账号
-        with open(INVALID_ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
+        invalid_accounts_file = os.path.join(X_DIR, "x_invalid_account.txt")
+        with open(invalid_accounts_file, 'w', encoding='utf-8') as f:
             f.write("")
         return ACCOUNTS
     
     return valid_accounts
 
-
-def check_ai_related(contents, followers_count):
-    """检查内容是否与AI相关"""
-    # 如果粉丝数低于阈值，直接返回 False
-    if followers_count < 1000:
-        print(f"粉丝数 {followers_count} 低于1000，不符合关注条件")
-        return False
-
-    try:
-        prompt = ("请根据提交的内容，判断该博主是否在 AI 领域值得关注。判断需基于专业性、内容可信度、与 AI 行业新闻的相关性以及吸引力。"
-                  "特别要求：必须严格判断与 AI 行业新闻的相关性；若内容仅涉及 AI 工具使用或非核心应用（如 AI 绘画），直接判定为不值得关注。"
-                  "额外判断条件：博主粉丝量需大于 1000 才判断为值得关注。"
-                  "根据判断内容仅返回 'true' 或 'false'，不添加任何其他内容。")
-        content = "\n".join(contents)
-
-        print("正在调用 AI API 判断内容相关性...")
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": content}
-            ],
-            stream=False,
-        )
-        result = response.choices[0].message.content.strip().lower()
-        print(f"API 返回结果: {result}")
-        return result == 'true'
-    except Exception as e:
-        print(f"AI API 调用失败: {e}")
-        # 如果API调用失败，默认返回 False
-        print("API 调用失败，默认为不值得关注")
-        return False
-
 class RateLimitException(Exception):
     """自定义异常，表示达到速率限制"""
     pass
-
 
 class XCrawler:
     def __init__(self):
@@ -151,9 +117,7 @@ class XCrawler:
         # 记录最后一次cookie更新时间的文件
         self.COOKIE_TIME_FILE = os.path.join(self.COOKIES_DIR, f"{self.USERNAME}_last_update.txt")
         
-        # 移除删除其他账号cookie的逻辑，保留所有账号的cookie文件
         print(f"使用账号 {self.USERNAME} 的cookie文件: {self.COOKIES_FILE}")
-        
         
         # 确保用户数据目录存在
         if not os.path.exists(self.USER_DATA_DIR):
@@ -162,27 +126,6 @@ class XCrawler:
         else:
             print(f"使用现有用户数据目录: {self.USER_DATA_DIR}")
         
-        # 获取x_follow目录路径
-        self.FOLLOW_DIR = os.path.join(X_DIR, "x_follow")
-        if not os.path.exists(self.FOLLOW_DIR):
-            os.makedirs(self.FOLLOW_DIR)
-
-        # 确保following文件存在
-        for filename in ['following.txt', 'all_following.txt']:
-            filepath = os.path.join(self.FOLLOW_DIR, filename)
-            if not os.path.exists(filepath):
-                with open(filepath, 'w') as f:
-                    pass
-
-        # 读取已关注博主列表
-        with open(os.path.join(self.FOLLOW_DIR, 'following.txt'), 'r', encoding='utf-8') as f:
-            self.before_following = set(f.read().splitlines())
-        with open(os.path.join(self.FOLLOW_DIR, 'all_following.txt'), 'r', encoding='utf-8') as f:
-            self.all_following = set(f.read().splitlines())
-
-        # 访问过的博主
-        self.visited_bloggers = set()
-
         # 初始化driver
         self.driver = self.setup_driver()
         print(f"使用账号 {self.USERNAME} 进行操作")
@@ -1486,62 +1429,6 @@ class XCrawler:
         except Exception as e:
             print(f"保存到临时存储时出错: {e}")
 
-    def follow_blogger(self, blogger_url):
-        """关注博主"""
-        # 检查浏览器状态
-        if not self._is_browser_alive():
-            print("浏览器已关闭，无法继续执行关注操作")
-            return False
-            
-        try:
-            # 访问博主页面
-            self.driver.get(blogger_url)
-            time.sleep(3)
-            
-            # 获取博主用户名
-            try:
-                username_element = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, '//div[@data-testid="UserName"]//span'))
-                )
-                blogger_name = username_element.text.strip()
-            except:
-                blogger_name = blogger_url.split('/')[-1]
-            
-            print(f"尝试关注博主: {blogger_name}")
-            
-            # 检查是否已经关注
-            try:
-                follow_button = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="follow"]'))
-                )
-                
-                # 如果找到关注按钮，说明尚未关注
-                print(f"检测到未关注状态，尝试点击关注按钮")
-                
-                # 尝试点击关注按钮
-                try:
-                    follow_button.click()
-                    time.sleep(2)
-                except:
-                    # 如果常规点击失败，尝试JS点击
-                    try:
-                        self.driver.execute_script("arguments[0].click();", follow_button)
-                        time.sleep(2)
-                    except Exception as e:
-                        print(f"使用JS点击关注按钮失败: {e}")
-                        return False
-                
-                print(f"已成功关注博主: {blogger_name}")
-                return True
-            except:
-                # 没有找到关注按钮，可能已经关注
-                print(f"未找到关注按钮，可能已经关注博主: {blogger_name}")
-                return False
-                
-        except Exception as e:
-            print(f"关注博主过程中出错: {e}")
-            return False
-
     def close(self):
         """关闭浏览器并清理资源"""
         if self.driver:
@@ -1549,21 +1436,6 @@ class XCrawler:
                 self.driver.quit()
             except:
                 pass
-
-        # 显示本次新关注的博主
-        try:
-            with open(os.path.join(self.FOLLOW_DIR, 'following.txt'), 'r', encoding='utf-8') as f:
-                after_following = set(f.read().splitlines())
-            new_following = after_following - self.before_following
-
-            print("\n本次运行新关注的博主：")
-            if new_following:
-                for blogger in new_following:
-                    print(blogger)
-            else:
-                print("本次运行未关注新博主")
-        except:
-            pass
 
     def _get_existing_posts(self):
         """获取已存在的帖子数据，避免重复爬取"""
@@ -1643,18 +1515,11 @@ class XCrawler:
         """
         运行爬虫的主函数
         
-        爬虫流程分为两个阶段：
-        1. 爬取资讯阶段：
-           - 搜索AI相关资讯
-           - 滚动页面爬取50条推文
-           - 将推文保存到临时文件 x_tempdata.json
-           
-        2. 博主关注阶段：
-           - 从爬取的推文中提取博主信息
-           - 访问每个博主的主页
-           - 爬取博主最新的3条推文
-           - 使用AI判断博主是否值得关注
-           - 如果值得关注，则关注博主并记录信息
+        爬虫流程：
+        - 登录X.com
+        - 搜索AI相关资讯
+        - 滚动页面爬取50条推文
+        - 将推文保存到临时文件 x_tempdata.json
         """
         try:
             # 登录X.com，会自动更新cookie
@@ -1665,8 +1530,8 @@ class XCrawler:
             # 刷新cookie - 访问一些安全的页面来确保cookie活跃
             self._refresh_cookie()
 
-            # 阶段1: 爬取资讯
-            print("\n===== 阶段1: 爬取资讯 =====")
+            # 爬取资讯
+            print("\n===== 爬取资讯 =====")
             
             # 先获取已有的数据，避免重复爬取
             existing_posts = self._get_existing_posts()
@@ -1695,185 +1560,10 @@ class XCrawler:
             self.save_to_temp_storage(formatted_posts)
             print(f"已将 {len(formatted_posts)} 条资讯保存到临时存储")
             
-            # 阶段2: 处理博主关注
-            print("\n===== 阶段2: 处理博主关注 =====")
-            followed_count = 0
-            try:
-                # 从爬取的帖子中提取博主URL
-                blogger_urls = []
-                for post in posts:
-                    # 构建博主URL，统一使用x.com而不是twitter.com
-                    username = post.get('username', '')
-                    if username:
-                        # 使用x.com域名而不是twitter.com
-                        blogger_url = f"https://x.com/{username}"
-                        blogger_urls.append({
-                            'url': blogger_url,
-                            'username': username,
-                            'followers_count': post.get('followers_count', 0)
-                        })
-                
-                print(f"提取到 {len(blogger_urls)} 个博主URL")
-                
-                # 用于记录处理过程中已访问的博主，如果出错会从中移除
-                temp_visited = set()
-                
-                # 处理博主，直到达到速率限制
-                for i, blogger_info in enumerate(blogger_urls):
-                    print(f"\n处理博主 {i+1}/{len(blogger_urls)}: {blogger_info['username']}")
-                    
-                    # 每处理5个博主，检查一次浏览器状态并刷新cookie
-                    if i > 0 and i % 5 == 0:
-                        if not self._is_browser_alive():
-                            print("浏览器已关闭，尝试重新创建")
-                            self._recreate_browser()
-                            if not self.driver:
-                                print("无法重新创建浏览器，终止关注流程")
-                                break
-                        self._refresh_cookie()
-                    
-                    # 检查是否已关注或访问过
-                    blogger_url = blogger_info['url']
-                    if blogger_url in self.all_following:
-                        print(f"博主 {blogger_info['username']} 已关注过，跳过")
-                        continue
-
-                    if blogger_url in self.visited_bloggers:
-                        print(f"博主 {blogger_info['username']} 本次运行已访问过，跳过")
-                        continue
-                    
-                    # 先将博主添加到临时访问集合
-                    temp_visited.add(blogger_url)
-                    
-                    try:
-                        # 访问博主页面
-                        print(f"正在访问博主页面: {blogger_url}")
-                        self.driver.get(blogger_url)
-                        
-                        # 等待页面加载并检查浏览器状态
-                        try:
-                            WebDriverWait(self.driver, 15).until(
-                                EC.presence_of_element_located((By.XPATH, '//div[@data-testid="UserName"]'))
-                            )
-                            print("博主页面加载完成")
-                        except Exception as e:
-                            print(f"等待页面加载出错: {e}")
-                            if not self._is_browser_alive():
-                                raise Exception("浏览器已关闭")
-                            continue
-
-                        # 滚动页面加载更多推文
-                        for _ in range(3):
-                            try:
-                                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                                time.sleep(2)
-                            except Exception as e:
-                                print(f"滚动页面出错: {e}")
-                                if not self._is_browser_alive():
-                                    raise Exception("浏览器已关闭")
-
-                        # 获取博主的最近推文
-                        try:
-                            tweet_elements = self.driver.find_elements(By.XPATH, '//article[@data-testid="tweet"]//div[@lang]')
-                            if not tweet_elements:
-                                print("未找到推文元素，可能是遇到了速率限制")
-                                # 不再调用retry_with_another_account方法，而是直接终止进程
-                                print("检测到可能的速率限制，终止爬虫进程")
-                                return 0
-                        except Exception as e:
-                            if not self._is_browser_alive():
-                                raise Exception("浏览器已关闭")
-                            else:
-                                print(f"获取推文元素时出错: {e}")
-                                # 检查是否是会话无效错误
-                                if "invalid session id" in str(e).lower():
-                                    print("检测到无效会话ID错误，尝试重新创建浏览器...")
-                                    if self._recreate_browser():
-                                        print("浏览器重新创建成功，继续处理博主")
-                                        continue
-                                    else:
-                                        print("浏览器重新创建失败，终止爬虫进程")
-                                        return 0
-                                # 检查错误信息是否表明速率限制
-                                elif "rate limit" in str(e).lower() or "429" in str(e) or "too many requests" in str(e).lower():
-                                    print("检测到速率限制错误，终止爬虫进程")
-                                    return 0
-                                continue
-
-                        # 提取推文文本
-                        recent_posts_texts = [tweet.text.replace('\n', ' ') for tweet in tweet_elements[:3]]
-                        print(f"成功获取到 {len(recent_posts_texts)} 条推文")
-
-                        # 获取关注者数量
-                        try:
-                            followers_elem = self.driver.find_element(By.XPATH, '//a[contains(@href, "/followers")]/span/span')
-                            followers_text = followers_elem.text
-                            # 处理可能的"1.2万"格式
-                            if '万' in followers_text:
-                                followers_count = int(float(followers_text.replace('万', '')) * 10000)
-                            else:
-                                followers_count = int(followers_text.replace(',', ''))
-                        except:
-                            followers_count = blogger_info.get('followers_count', 0)
-                            print(f"无法获取准确的关注者数量，使用默认值: {followers_count}")
-
-                        # 使用AI API判断是否与AI相关
-                        is_ai_related = check_ai_related(recent_posts_texts, followers_count)
-                        print(f"AI 相关性检查结果: {is_ai_related}")
-
-                        if is_ai_related:
-                            print("推文与AI相关，尝试关注博主")
-                            if self.follow_blogger(blogger_url):
-                                followed_count += 1
-                                # 将博主信息添加到following.txt文件
-                                with open(os.path.join(self.FOLLOW_DIR, 'following.txt'), 'a', encoding='utf-8') as f:
-                                    f.write(blogger_info['username'] + '\n')
-                                # 将博主URL添加到all_following.txt文件
-                                with open(os.path.join(self.FOLLOW_DIR, 'all_following.txt'), 'a', encoding='utf-8') as f:
-                                    f.write(blogger_url + '\n')
-                                self.all_following.add(blogger_url)
-                                print(f"成功关注博主: {blogger_info['username']}, 当前已关注 {followed_count} 个新博主")
-                                
-                                # 关注成功后，更新cookie
-                                self._update_cookie_timestamp()
-                        else:
-                            print("推文与AI无关，不关注博主")
-
-                        # 处理成功，将博主添加到已访问集合
-                        self.visited_bloggers.add(blogger_url)
-
-                    except Exception as e:
-                        # 处理出错，从临时访问集合中移除博主
-                        temp_visited.discard(blogger_url)
-                        
-                        if "no such window" in str(e) or "浏览器已关闭" in str(e):
-                            print(f"浏览器窗口已关闭，尝试重新创建")
-                            if self._recreate_browser():
-                                print("成功重新创建浏览器，将继续处理博主")
-                                # 注意：被中断的博主不会被标记为已访问，下次会重试
-                                time.sleep(5)  # 等待一段时间再继续
-                            else:
-                                print("无法重新创建浏览器，终止关注流程")
-                                break
-                        else:
-                            print(f"处理博主 {blogger_info['username']} 时出错: {e}")
-                            continue
-                    
-                    # 随机暂停一段时间，避免被反爬
-                    time.sleep(random.uniform(3, 6))
-                    
-                # 将确认访问过的博主添加到已访问集合
-                self.visited_bloggers.update(temp_visited)
-                    
-            except Exception as e:
-                print(f"博主关注阶段出错: {e}")
-                import traceback
-                traceback.print_exc()
-            
             # 任务完成后，再次更新cookie
             self._safe_update_cookie()
             
-            print(f"\n爬虫任务完成! 爬取了 {len(posts)} 条资讯，关注了 {followed_count} 个新博主")
+            print(f"\n爬虫任务完成! 爬取了 {len(posts)} 条资讯")
             return len(posts)
 
         except Exception as e:

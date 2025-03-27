@@ -56,7 +56,7 @@ logger = logging.getLogger("cleandata")
 # 常量定义
 API_KEY = 'p9mtsT4ioDYm1'
 API_BASE_URL = 'https://ai.liaobots.work/v1'
-MODEL_NAME = 'gemini-2.0-flash-exp'
+MODEL_NAME = 'Gemini-2.5-Pro-Exp'
 
 # 初始化 OpenAI 客户端
 client = OpenAI(
@@ -82,7 +82,7 @@ class SystemPrompts:
         """获取处理X.com数据的系统提示词"""
         return (
             "你是一位专业的AI行业资讯分析整理师，请将X.com上的推文整理为标准的新闻格式。\n\n"
-            "如果内容与AI技术、人工智能应用或机器学习等领域无关，请直接回复:\"这条资讯与AI无关，跳过。\"\n\n"
+            "如果内容与AI技术、人工智能应用或机器学习等领域无关，请直跳过该资讯，不返回任何内容。\"\n\n"
             "如果内容与AI相关，请按以下格式返回清洗后的内容：\n\n"
             "标题: [根据内容生成的标题，确保简洁明了并包含关键信息]\n"
             "正文: [推文的主要内容，清晰简洁的行业新闻格式，移除冗余信息，保持专业性]\n"
