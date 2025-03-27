@@ -176,7 +176,7 @@ class MongoDB:
             logger.error(f"根据ID获取文章失败: {e}")
             return None
     
-    def search_articles(self, query: str, skip: int = 0, limit: int = 10) -> List[Dict[str, Any]]:
+    def search_articles(self, query: str, skip: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
         """搜索文章
         
         Args:
@@ -188,13 +188,33 @@ class MongoDB:
             匹配的文章列表
         """
         try:
-            # 使用全文搜索
-            cursor = self.collection.find(
-                {"$text": {"$search": query}},
-                {"score": {"$meta": "textScore"}}
-            ).sort([("score", {"$meta": "textScore"})])
+            # 增强搜索功能，支持多字段搜索和部分匹配
+            search_query = {
+                "$or": [
+                    # 全文搜索
+                    {"$text": {"$search": query}},
+                    # 标题部分匹配
+                    {"title": {"$regex": query, "$options": "i"}},
+                    # 内容部分匹配
+                    {"content": {"$regex": query, "$options": "i"}},
+                    # 作者部分匹配
+                    {"author": {"$regex": query, "$options": "i"}}
+                ]
+            }
+            
+            # 先尝试使用全文搜索排序（如果匹配），然后按日期排序
+            cursor = self.collection.find(search_query)
+            
+            # 按日期倒序排序
+            cursor = cursor.sort([("date_time", -1)])
+            
+            # 应用分页
             cursor = cursor.skip(skip).limit(limit)
-            return self._serialize_docs(list(cursor))
+            
+            # 获取并序列化结果
+            results = self._serialize_docs(list(cursor))
+            logger.info(f"搜索关键词 '{query}' 找到 {len(results)} 个结果")
+            return results
         except Exception as e:
             logger.error(f"搜索文档失败: {e}")
             return []

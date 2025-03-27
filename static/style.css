@@ -631,3 +631,76 @@ footer {
 .load-more-button:active {
     background-color: #2d6da3;
 }
+
+/* X.com 卡片的三段式结构样式 */
+.x-news .news-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 15px;
+    border-bottom: 1px solid #e1e8ed;
+    background-color: #f8f9fa;
+}
+
+.x-news .news-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #14171a;
+    margin: 0;
+    flex: 1;
+    margin-right: 15px;
+}
+
+.x-news .news-time {
+    font-size: 0.9rem;
+    color: #657786;
+    white-space: nowrap;
+}
+
+.x-news .news-content {
+    padding: 15px;
+    font-size: 0.95rem;
+    color: #14171a;
+    flex: 1;
+    min-height: 80px;
+    line-height: 1.5;
+}
+
+.x-news .news-footer {
+    padding: 15px;
+    background-color: #f7f9fa;
+    border-top: 1px solid #e1e8ed;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.x-news .news-author {
+    font-size: 0.9rem;
+    color: #14171a;
+}
+
+.x-news .news-social-stats {
+    font-size: 0.85rem;
+    color: #657786;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.x-news .news-source {
+    font-size: 0.85rem;
+    color: #657786;
+    word-break: break-word;
+    padding-top: 8px;
+    border-top: 1px dashed #e1e8ed;
+}
+
+.x-news .news-source a {
+    color: #1d9bf0;
+    text-decoration: none;
+}
+
+.x-news .news-source a:hover {
+    text-decoration: underline;
+}

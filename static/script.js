@@ -141,8 +141,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
         
-        // 使用 API 端点
-        const apiUrl = 'https://crawl-beta.vercel.app/api/articles';
+        // 使用相对路径 API 端点
+        const apiUrl = '/api/articles';
         
         fetch(apiUrl, {
             method: 'GET',
@@ -184,43 +184,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 filterAndDisplayNews();
             })
             .catch(error => {
-                console.error('获取远程数据失败:', error);
+                // 标记加载完成
+                isLoading = false;
                 
-                // 尝试使用本地样本数据
-                console.log('尝试使用本地样本数据...');
-                fetch('/data/sample.json')
-                    .then(response => response.json())
-                    .then(sampleData => {
-                        // 标记加载完成
-                        isLoading = false;
-                        
-                        // 恢复刷新按钮
-                        if (refreshButton) {
-                            refreshButton.disabled = false;
-                            refreshButton.classList.remove('disabled');
-                        }
-                        
-                        // 保存所有数据
-                        allNewsData = sampleData.data || [];
-                        
-                        // 重置为第一页
-                        currentPage = 1;
-                        
-                        // 根据当前选中的标签过滤并显示新闻
-                        filterAndDisplayNews();
-                    })
-                    .catch(localError => {
-                        // 本地数据也失败了
-                        console.error('获取本地数据也失败:', localError);
-                        isLoading = false;
-                        
-                        if (refreshButton) {
-                            refreshButton.disabled = false;
-                            refreshButton.classList.remove('disabled');
-                        }
-                        
-                        showError('获取数据失败，请稍后再试: ' + error.message);
-                    });
+                // 恢复刷新按钮
+                if (refreshButton) {
+                    refreshButton.disabled = false;
+                    refreshButton.classList.remove('disabled');
+                }
+                
+                console.error('获取数据失败:', error);
+                showError('获取资讯数据失败，请稍后再试');
             });
     }
 
@@ -243,8 +217,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
         
-        // 使用新的搜索 API 端点
-        const searchApiUrl = `https://crawl-beta.vercel.app/api/search?q=${encodeURIComponent(query)}`;
+        // 使用相对路径API端点
+        const searchApiUrl = `/api/search?q=${encodeURIComponent(query)}`;
         
         fetch(searchApiUrl, {
             method: 'GET',
@@ -600,18 +574,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const grouped = {};
         
         newsData.forEach(news => {
-            // 优先使用 date_time 字段，如果不存在则尝试使用 published_date 或 published_at 字段
+            // 从日期时间字段中提取日期部分
             let dateStr = '未知日期';
             
             if (news.date_time) {
-                // 处理 date_time 格式（可能包含时间部分）
-                dateStr = news.date_time.split(' ')[0];
+                dateStr = extractDate(news.date_time);
             } else if (news.published_date) {
-                // 直接使用 published_date（通常只有日期部分）
                 dateStr = news.published_date;
             } else if (news.published_at) {
-                // 使用 published_at 字段（X.com数据使用这个字段）
-                dateStr = news.published_at.split(' ')[0];
+                dateStr = extractDate(news.published_at);
             }
             
             if (!grouped[dateStr]) {
@@ -624,28 +595,64 @@ document.addEventListener('DOMContentLoaded', function() {
         return grouped;
     }
 
+    // 提取日期部分（YY/MM/DD）
+    function extractDate(dateTimeStr) {
+        if (!dateTimeStr) return '未知日期';
+        
+        // 如果包含空格，说明有日期和时间，取第一部分作为日期
+        if (dateTimeStr.includes(' ')) {
+            return dateTimeStr.split(' ')[0];
+        }
+        
+        // 否则直接返回，可能只有日期
+        return dateTimeStr;
+    }
+
+    // 提取时间部分（HH:MM）
+    function extractTime(dateTimeStr) {
+        if (!dateTimeStr || !dateTimeStr.includes(' ')) return '';
+        
+        // 分离出时间部分
+        const timePart = dateTimeStr.split(' ')[1];
+        
+        // 返回时间部分（可能需要进一步处理格式）
+        return timePart;
+    }
+
     // 格式化日期显示
     function formatDate(dateStr) {
-        if (dateStr === '未知日期') return dateStr;
+        if (!dateStr || dateStr === '未知日期') return dateStr;
 
         try {
-            const date = new Date(dateStr);
+            // 确保只处理日期部分
+            const dateOnly = extractDate(dateStr);
+            
+            const date = new Date(dateOnly);
             const now = new Date();
             const yesterday = new Date(now);
             yesterday.setDate(now.getDate() - 1);
 
             // 如果是今天或昨天，显示特殊文本
             if (isSameDay(date, now)) {
-                return '今天 · ' + dateStr;
+                return '今天 · ' + dateOnly;
             } else if (isSameDay(date, yesterday)) {
-                return '昨天 · ' + dateStr;
+                return '昨天 · ' + dateOnly;
             } else {
-                // 否则显示常规日期格式
-                return dateStr;
+                // 格式化日期为YYYY-MM-DD
+                return dateOnly;
             }
         } catch (e) {
+            console.error('日期格式化错误:', e);
             return dateStr;
         }
+    }
+
+    // 格式化时间显示
+    function formatTime(timeStr) {
+        if (!timeStr) return '';
+        
+        // 基础格式化，未来可以根据需要增加AM/PM等
+        return timeStr;
     }
 
     // 判断两个日期是否是同一天
@@ -661,98 +668,110 @@ document.addEventListener('DOMContentLoaded', function() {
             const card = document.createElement('article');
             card.className = 'news-card';
             
-            // 根据来源设置不同的样式
-            if (news.source === 'x.com') {
-                card.classList.add('x-news');
-            } else if (news.source === 'crunchbase.com') {
-                card.classList.add('crunchbase-news');
-            }
-            
             // 获取新闻数据，适配新的 API 数据结构
             const source = news.source || '';
             const sourceUrl = news.source_url || '';
             const title = news.title || '';
             const content = news.content || '';
             const dateTime = news.date_time || '';
-            
-            // X.com 特有字段，可能存在于 raw 字段中
             let author = news.author || '';
-            let username = '';
-            let followersCount = 0;
-            let favoriteCount = 0;
-            let retweetCount = 0;
+            let followersCount = news.followers_count || 0;
+            let favoriteCount = news.favorite_count || 0;
+            let retweetCount = news.retweet_count || 0;
             
-            // 尝试从 raw 数据中提取更多信息
-            if (news.raw) {
-                if (typeof news.raw === 'string') {
-                    try {
-                        const rawData = JSON.parse(news.raw);
-                        username = rawData.username || '';
-                        followersCount = rawData.followers_count || 0;
-                        favoriteCount = rawData.favorite_count || 0;
-                        retweetCount = rawData.retweet_count || 0;
-                    } catch (e) {
-                        console.error('解析 raw 数据失败:', e);
-                    }
-                } else {
-                    // raw 已经是对象
-                    username = news.raw.username || '';
-                    followersCount = news.raw.followers_count || 0;
-                    favoriteCount = news.raw.favorite_count || 0;
-                    retweetCount = news.raw.retweet_count || 0;
-                }
-            }
-            
-            // 构建卡片 HTML
-            let cardHTML = '';
-            
-            // 标题部分（如果有）
-            if (title) {
-                cardHTML += `<h3 class="news-title">${escapeHtml(title)}</h3>`;
-            }
-            
-            // 内容部分
-            cardHTML += `<div class="news-content">${formatContent(content)}</div>`;
-            
-            // 元数据部分
-            cardHTML += '<div class="news-meta">';
-            
-            // 日期和来源
-            cardHTML += `<div class="news-date">${formatDate(dateTime)}</div>`;
-            cardHTML += `<div class="news-source">来源: <a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>`;
-            
-            // X.com 特有的元数据
+            // 根据来源设置不同的样式并构建卡片
             if (source === 'x.com') {
-                if (author || username) {
-                    cardHTML += '<div class="news-author">';
-                    cardHTML += `作者: ${escapeHtml(author || '')}`;
-                    if (username) {
-                        if (author) cardHTML += ' ';
-                        cardHTML += `(@${escapeHtml(username)})`;
-                    }
-                    cardHTML += '</div>';
+                card.classList.add('x-news');
+                
+                // 提取日期和时间部分
+                const dateStr = extractDate(dateTime);
+                const timeStr = extractTime(dateTime);
+                
+                // 构建X.com三段式卡片
+                // 第一段：标题(左)和时间(右)
+                let cardHTML = '<div class="news-card-header">';
+                if (title) {
+                    cardHTML += `<h3 class="news-title">${escapeHtml(title)}</h3>`;
+                }
+                if (timeStr) {
+                    cardHTML += `<div class="news-time">${formatTime(timeStr)}</div>`;
+                }
+                cardHTML += '</div>';
+                
+                // 第二段：正文内容
+                cardHTML += `<div class="news-content">${formatContent(content)}</div>`;
+                
+                // 第三段：作者、社交数据、来源
+                cardHTML += '<div class="news-footer">';
+                
+                // 第一行：作者
+                if (author) {
+                    cardHTML += `<div class="news-author">作者: ${escapeHtml(author)}</div>`;
                 }
                 
-                // 社交数据
-                if (followersCount || favoriteCount || retweetCount) {
-                    cardHTML += '<div class="news-social-stats">';
-                    if (followersCount) {
-                        cardHTML += `<span class="stat followers" title="粉丝数"><i class="icon-user"></i>${formatNumber(followersCount)}</span>`;
-                    }
-                    if (favoriteCount) {
-                        cardHTML += `<span class="stat likes" title="点赞数"><i class="icon-heart"></i>${formatNumber(favoriteCount)}</span>`;
-                    }
-                    if (retweetCount) {
-                        cardHTML += `<span class="stat retweets" title="转发数"><i class="icon-retweet"></i>${formatNumber(retweetCount)}</span>`;
-                    }
-                    cardHTML += '</div>';
+                // 第二行：社交数据 (粉丝、点赞、转发)
+                cardHTML += '<div class="news-social-stats">';
+                cardHTML += `粉丝数量：${formatNumber(followersCount)} 点赞数量：${formatNumber(favoriteCount)} 转发数量：${formatNumber(retweetCount)}`;
+                cardHTML += '</div>';
+                
+                // 第三行：来源地址
+                cardHTML += `<div class="news-source">来源地址：<a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>`;
+                
+                cardHTML += '</div>'; // 结束 news-footer
+                
+                // 设置卡片内容
+                card.innerHTML = cardHTML;
+            } else if (source === 'crunchbase.com') {
+                // 保持 Crunchbase 卡片原有结构不变
+                card.classList.add('crunchbase-news');
+                
+                // 构建卡片 HTML
+                let cardHTML = '';
+                
+                // 标题部分（如果有）
+                if (title) {
+                    cardHTML += `<h3 class="news-title">${escapeHtml(title)}</h3>`;
                 }
+                
+                // 内容部分
+                cardHTML += `<div class="news-content">${formatContent(content)}</div>`;
+                
+                // 元数据部分
+                cardHTML += '<div class="news-meta">';
+                
+                // 日期和来源
+                cardHTML += `<div class="news-date">${formatDate(dateTime)}</div>`;
+                cardHTML += `<div class="news-source">来源: <a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>`;
+                
+                cardHTML += '</div>'; // 结束 news-meta
+                
+                // 设置卡片内容
+                card.innerHTML = cardHTML;
+            } else {
+                // 其他来源的默认卡片结构
+                // 构建卡片 HTML
+                let cardHTML = '';
+                
+                // 标题部分（如果有）
+                if (title) {
+                    cardHTML += `<h3 class="news-title">${escapeHtml(title)}</h3>`;
+                }
+                
+                // 内容部分
+                cardHTML += `<div class="news-content">${formatContent(content)}</div>`;
+                
+                // 元数据部分
+                cardHTML += '<div class="news-meta">';
+                
+                // 日期和来源
+                cardHTML += `<div class="news-date">${formatDate(dateTime)}</div>`;
+                cardHTML += `<div class="news-source">来源: <a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>`;
+                
+                cardHTML += '</div>'; // 结束 news-meta
+                
+                // 设置卡片内容
+                card.innerHTML = cardHTML;
             }
-            
-            cardHTML += '</div>'; // 结束 news-meta
-            
-            // 设置卡片内容
-            card.innerHTML = cardHTML;
             
             return card;
         } catch (e) {

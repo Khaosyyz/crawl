@@ -80,54 +80,54 @@ class SystemPrompts:
     @staticmethod
     def get_x_prompt() -> str:
         """获取处理X.com数据的系统提示词"""
-        return ("将资讯按以下固定格式整理成中文新闻：\n\n"
-                "完整日期时间，格式为YYYY-MM-DD HH:MM\n"
-                "根据内容自拟标题，精简且保持吸引力，确保标题中的英文和数字前后都有空格提高可读性\n"
-                "资讯内容，内容必须与作者信息完全分离，不要在内容中包含作者信息、'详情请查看'或重复来源链接（来源链接会单独保存）\n"
-                "保留原文或标题某些专有英文名词，不要翻译，例如 AI，或是公司名，人名之类\n"
-                "作者：[作者名] (@[用户名])\n"
-                "粉丝数：[粉丝数] | 点赞：[点赞数] | 转发：[转发数]\n\n"
-                "资讯内容和标题都应以新闻文笔优化原文，英文和数字前后必须加空格提高可读性。必须严格删除与AI无关的内容，"
-                "如果整条内容与AI技术、人工智能应用、机器学习等完全无关，则直接跳过该条不处理。直接输出整理后的资讯，不要在开头或结束添加任何"
-                "额外说明、标题或格式符号。不要在正文中描述点赞和转发数据、包含作者信息或添加'阅读原文'、'详情请查看'等提示。按发布时间排序，"
-                "并在日期时间前依次添加序号，例如1.。\n\n"
-                "特别注意：资讯内容不应包含任何作者信息，作者信息必须单独成行，以'作者：'开头。")
+        return (
+            "你是一位专业的AI行业资讯分析整理师，请将X.com上的推文整理为标准的新闻格式。\n\n"
+            "如果内容与AI技术、人工智能应用或机器学习等领域无关，请直接回复:\"这条资讯与AI无关，跳过。\"\n\n"
+            "如果内容与AI相关，请按以下格式返回清洗后的内容：\n\n"
+            "标题: [根据内容生成的标题，确保简洁明了并包含关键信息]\n"
+            "正文: [推文的主要内容，清晰简洁的行业新闻格式，移除冗余信息，保持专业性]\n"
+            "作者: [原作者名] (@[用户名])\n"
+            "粉丝数: [粉丝数值]\n"
+            "点赞数: [点赞数值]\n"
+            "转发数: [转发数值]\n"
+            "日期: [原文发布日期，格式为YYYY-MM-DD HH:MM]\n\n"
+            
+            "处理要求：\n"
+            "1. 必须严格按照以上字段顺序和格式返回\n"
+            "2. 标题必须提取或生成，不可为空\n"
+            "3. 正文必须经过整理，以专业新闻的语气呈现\n"
+            "4. 保留专有名词的英文原文\n"
+            "5. 英文和数字前后需加空格提高可读性\n"
+            "6. 所有返回必须是结构化的字段，便于JSON解析\n"
+            "7. 不在返回内容中添加额外说明或注释\n"
+            "8. 所有内容必须有明确边界，每个字段单独成行"
+        )
     
     @staticmethod
     def get_crunchbase_prompt() -> str:
         """获取处理Crunchbase数据的系统提示词"""
-        return ("你是一位专业的投资信息分析专家，你的任务是将英文Crunchbase文章完整翻译并整理为结构化中文内容。\n\n"
-                "直接输出转换后的内容，不要添加任何前言、后语或额外说明。严格按照以下格式输出：\n\n"
-                "原文发布日期，格式为YYYY-MM-DD\n"  # 按照格式清洗
-                "根据内容给出简明扼要的中文标题，强调投资/融资相关信息\n"  # 直接给出中文标题，不要加粗、不要加引号或其他格式
-                "完整将原文的标题，内容都翻译成中文，且必须翻译成中文，分段清晰\n\n"  # 完整翻译成中文，分段清晰
-                "作者：原作者姓名\n"  # 原作者信息
-                "公司/产品：相关公司或产品名称\n"  # 从文章提取的公司或产品信息
-                "投资信息：融资金额，投资方\n\n"  # 融资信息摘要，如有
-                
-                "无论输入何种格式，请确保输出的一致性：\n"
-                "1. 如果没有完整日期，仅提供年份\n"
-                "2. 标题必须突出投资和融资信息\n"
-                "3. 完整保留所有关键业务细节和数字\n"
-                "4. 确保段落之间有空行，保持原文的结构\n"
-                "5. 请根据输入内容，提取或推断公司、产品、投资信息等要素\n"
-                "6. 如果原文没有某些字段信息，用'未提供'代替，而不是省略该字段\n"
-                "7. 如果输入混乱或缺少关键信息，尽量从现有内容中提取逻辑，生成合理内容\n"
-                
-                "翻译要求：\n"
-                "- 必须将所有非中文内容完整翻译成中文，不保留任何英文原文（公司名、产品名、人名等专有名词除外）\n"
-                "- 确保没有任何内容被跳过或保持英文状态\n"
-                "- 避免使用任何非中文表达，如俄语、法语等其他语言词汇\n"
-                "- 专业术语必须使用中文对应词汇，不要保留英文术语\n"
-                "- 所有段落、句子必须100%翻译成中文，不遗漏任何内容\n"
-                
-                "格式要求：\n"
-                "- 使用简洁流畅的中文表达\n"
-                "- 准确保留所有数字、融资金额、估值等财务数据\n"
-                "- 不要添加分隔符或使用markdown格式\n"
-                "- 英文和数字前后加空格提高可读性\n"
-                "- 保留原文的段落结构和换行格式\n"
-                "- 如果原文没有提供明确数据，请用'未知'代替\n")
+        return (
+            "你是一位专业的投资信息分析整理师，请将Crunchbase文章处理为标准的新闻格式。\n\n"
+            "请按以下格式返回清洗后的内容：\n\n"
+            "标题: [根据内容生成的标题，突出投资和融资信息]\n"
+            "正文: [完整翻译成中文的文章内容，分段清晰]\n"
+            "作者: [原作者姓名]\n"
+            "公司: [相关公司名称]\n"
+            "融资轮次: [轮次信息，如种子轮、A轮等]\n"
+            "融资金额: [融资金额]\n"
+            "投资方: [投资机构或个人]\n"
+            "日期: [原文发布日期，格式为YYYY-MM-DD]\n\n"
+            
+            "处理要求：\n"
+            "1. 必须严格按照以上字段顺序和格式返回\n"
+            "2. 标题必须生成，突出融资关键信息\n"
+            "3. 正文必须完全翻译成中文，保留专有名词\n"
+            "4. 英文和数字前后需加空格提高可读性\n"
+            "5. 所有返回必须是结构化的字段，便于JSON解析\n"
+            "6. 不在返回内容中添加额外说明或注释\n"
+            "7. 如原文没有提供某字段信息，请使用'未提供'填充\n"
+            "8. 所有内容必须有明确边界，每个字段单独成行"
+        )
     
     @staticmethod
     def get_default_prompt() -> str:
@@ -291,18 +291,17 @@ class XDataProcessor(DataProcessor):
                     if not result:
                         continue
                     
-                    # 构建文章数据
-                    article = {
-                        "title": "",  # 将从AI返回结果中提取
-                        "content": result,
-                        "source": "x.com",
-                        "source_url": item.get("source_url", ""),
-                        "date_time": item.get("date_time", ""),
-                        "author": item.get("author", ""),
-                        "raw": item  # 保存原始数据
-                    }
+                    # 检查是否是"跳过"响应
+                    if "这条资讯与AI无关，跳过" in result:
+                        logger.info("资讯与AI无关，跳过处理")
+                        continue
                     
-                    processed_data.append(article)
+                    # 从AI返回结果中提取结构化数据
+                    article = self._parse_ai_response(result, item)
+                    
+                    # 确保article不为None
+                    if article:
+                        processed_data.append(article)
                     
                 except Exception as e:
                     logger.error(f"处理X.com数据项失败: {str(e)}")
@@ -315,10 +314,129 @@ class XDataProcessor(DataProcessor):
             self.storage.clear_temp_file(X_TEMP_DATA_PATH)
             
             return saved_count
+        except Exception as e:
+            logger.error(f"X.com数据处理失败: {str(e)}")
+            return 0
+    
+    def _parse_ai_response(self, response: str, original_item: Dict) -> Optional[Dict]:
+        """从AI响应中解析结构化数据
+        
+        Args:
+            response: AI返回的文本
+            original_item: 原始数据项
+            
+        Returns:
+            结构化的文章数据，解析失败则返回None
+        """
+        try:
+            # 初始化文章数据
+            article = {
+                "title": "",
+                "content": "",
+                "source": "x.com",
+                "source_url": original_item.get("source_url", ""),
+                "date_time": original_item.get("date_time", ""),
+                "author": "",
+                "followers_count": 0,
+                "favorite_count": 0,
+                "retweet_count": 0,
+                "raw": original_item
+            }
+            
+            # 解析AI返回的结构化内容
+            lines = response.strip().split('\n')
+            current_field = None
+            field_content = []
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # 检查是否是字段标识行
+                if ":" in line and len(line.split(":", 1)[0]) < 20:
+                    # 如果已有当前字段，先保存
+                    if current_field and field_content:
+                        field_value = '\n'.join(field_content).strip()
+                        if current_field == "标题":
+                            article["title"] = field_value
+                        elif current_field == "正文":
+                            article["content"] = field_value
+                        elif current_field == "作者":
+                            article["author"] = field_value
+                        elif current_field == "粉丝数":
+                            try:
+                                article["followers_count"] = int(field_value.replace(',', ''))
+                            except:
+                                pass
+                        elif current_field == "点赞数":
+                            try:
+                                article["favorite_count"] = int(field_value.replace(',', ''))
+                            except:
+                                pass
+                        elif current_field == "转发数":
+                            try:
+                                article["retweet_count"] = int(field_value.replace(',', ''))
+                            except:
+                                pass
+                        elif current_field == "日期":
+                            article["date_time"] = field_value
+                    
+                    # 设置新的当前字段
+                    field_parts = line.split(":", 1)
+                    current_field = field_parts[0].strip()
+                    field_content = [field_parts[1].strip()] if len(field_parts) > 1 else []
+                else:
+                    # 继续添加到当前字段
+                    if current_field:
+                        field_content.append(line)
+            
+            # 处理最后一个字段
+            if current_field and field_content:
+                field_value = '\n'.join(field_content).strip()
+                if current_field == "标题":
+                    article["title"] = field_value
+                elif current_field == "正文":
+                    article["content"] = field_value
+                elif current_field == "作者":
+                    article["author"] = field_value
+                elif current_field == "粉丝数":
+                    try:
+                        article["followers_count"] = int(field_value.replace(',', ''))
+                    except:
+                        pass
+                elif current_field == "点赞数":
+                    try:
+                        article["favorite_count"] = int(field_value.replace(',', ''))
+                    except:
+                        pass
+                elif current_field == "转发数":
+                    try:
+                        article["retweet_count"] = int(field_value.replace(',', ''))
+                    except:
+                        pass
+                elif current_field == "日期":
+                    article["date_time"] = field_value
+            
+            # 整理文章格式，确保文章结构完整
+            # 如果标题为空，从内容提取或生成一个
+            if not article["title"] and article["content"]:
+                first_line = article["content"].split('\n', 1)[0]
+                if len(first_line) < 100:
+                    article["title"] = first_line
+                else:
+                    article["title"] = first_line[:100] + "..."
+            
+            # 确保内容不为空
+            if not article["content"]:
+                logger.warning("解析后的文章内容为空，使用原始文本")
+                article["content"] = response
+            
+            return article
             
         except Exception as e:
-            logger.error(f"处理X.com数据失败: {str(e)}")
-            return 0
+            logger.error(f"解析AI响应失败: {str(e)}")
+            return None
 
 
 class CrunchbaseDataProcessor(DataProcessor):
@@ -348,18 +466,12 @@ class CrunchbaseDataProcessor(DataProcessor):
                     if not result:
                         continue
                     
-                    # 构建文章数据
-                    article = {
-                        "title": "",  # 将从AI返回结果中提取
-                        "content": result,
-                        "source": "crunchbase.com",
-                        "source_url": item.get("source_url", ""),
-                        "date_time": item.get("date_time", ""),
-                        "author": item.get("author", ""),
-                        "raw": item  # 保存原始数据
-                    }
+                    # 从AI返回结果中提取结构化数据
+                    article = self._parse_ai_response(result, item)
                     
-                    processed_data.append(article)
+                    # 确保article不为None
+                    if article:
+                        processed_data.append(article)
                     
                 except Exception as e:
                     logger.error(f"处理Crunchbase数据项失败: {str(e)}")
@@ -372,10 +484,116 @@ class CrunchbaseDataProcessor(DataProcessor):
             self.storage.clear_temp_file(CRU_TEMP_DATA_PATH)
             
             return saved_count
+        except Exception as e:
+            logger.error(f"Crunchbase数据处理失败: {str(e)}")
+            return 0
+    
+    def _parse_ai_response(self, response: str, original_item: Dict) -> Optional[Dict]:
+        """从AI响应中解析结构化数据
+        
+        Args:
+            response: AI返回的文本
+            original_item: 原始数据项
+            
+        Returns:
+            结构化的文章数据，解析失败则返回None
+        """
+        try:
+            # 初始化文章数据
+            article = {
+                "title": "",
+                "content": "",
+                "source": "crunchbase.com",
+                "source_url": original_item.get("source_url", ""),
+                "date_time": original_item.get("date_time", ""),
+                "author": "",
+                "company": "",
+                "funding_round": "",
+                "funding_amount": "",
+                "investors": "",
+                "raw": original_item
+            }
+            
+            # 解析AI返回的结构化内容
+            lines = response.strip().split('\n')
+            current_field = None
+            field_content = []
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # 检查是否是字段标识行
+                if ":" in line and len(line.split(":", 1)[0]) < 20:
+                    # 如果已有当前字段，先保存
+                    if current_field and field_content:
+                        field_value = '\n'.join(field_content).strip()
+                        if current_field == "标题":
+                            article["title"] = field_value
+                        elif current_field == "正文":
+                            article["content"] = field_value
+                        elif current_field == "作者":
+                            article["author"] = field_value
+                        elif current_field == "公司":
+                            article["company"] = field_value
+                        elif current_field == "融资轮次":
+                            article["funding_round"] = field_value
+                        elif current_field == "融资金额":
+                            article["funding_amount"] = field_value
+                        elif current_field == "投资方":
+                            article["investors"] = field_value
+                        elif current_field == "日期":
+                            article["date_time"] = field_value
+                    
+                    # 设置新的当前字段
+                    field_parts = line.split(":", 1)
+                    current_field = field_parts[0].strip()
+                    field_content = [field_parts[1].strip()] if len(field_parts) > 1 else []
+                else:
+                    # 继续添加到当前字段
+                    if current_field:
+                        field_content.append(line)
+            
+            # 处理最后一个字段
+            if current_field and field_content:
+                field_value = '\n'.join(field_content).strip()
+                if current_field == "标题":
+                    article["title"] = field_value
+                elif current_field == "正文":
+                    article["content"] = field_value
+                elif current_field == "作者":
+                    article["author"] = field_value
+                elif current_field == "公司":
+                    article["company"] = field_value
+                elif current_field == "融资轮次":
+                    article["funding_round"] = field_value
+                elif current_field == "融资金额":
+                    article["funding_amount"] = field_value
+                elif current_field == "投资方":
+                    article["investors"] = field_value
+                elif current_field == "日期":
+                    article["date_time"] = field_value
+            
+            # 整理文章格式，确保文章结构完整
+            # 如果标题为空，从内容提取或生成一个
+            if not article["title"] and article["content"]:
+                first_line = article["content"].split('\n', 1)[0]
+                if len(first_line) < 100:
+                    article["title"] = first_line
+                else:
+                    article["title"] = first_line[:100] + "..."
+            
+            # 确保内容不为空
+            if not article["content"]:
+                logger.warning("解析后的文章内容为空，使用原始文本")
+                article["content"] = response
+            
+            return article
             
         except Exception as e:
-            logger.error(f"处理Crunchbase数据失败: {str(e)}")
-            return 0
+            logger.error(f"解析AI响应失败: {str(e)}")
+            return None
 
 
 def process_all_data() -> bool:
