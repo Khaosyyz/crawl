@@ -164,24 +164,32 @@ document.addEventListener('DOMContentLoaded', function() {
             tabButtons.forEach(btn => btn.classList.remove('active'));
             this.classList.add('active');
             
+            // 完全清除现有内容和数据
+            newsContainer.innerHTML = '';
+            allNewsData = [];
+            
             // 更新当前数据源
             currentSource = this.dataset.source;
             
             // 重置为第一页
             currentPage = 1;
+            currentDatePage = 1;
+            
+            // 显示加载中提示
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'loading';
+            loadingMsg.textContent = '正在加载资讯...';
+            newsContainer.appendChild(loadingMsg);
             
             // 如果是 Crunchbase，重置显示数量
             if (currentSource === 'crunchbase.com') {
                 crunchbaseDisplayCount = 3;
             }
             
-            // 如果有搜索内容，重新执行搜索
-            if (currentSearchQuery) {
-                performSearch();
-            } else {
-                // 否则直接过滤显示数据
-                filterAndDisplayNews();
-            }
+            // 强制刷新数据
+            setTimeout(() => {
+                forceRefreshData();
+            }, 100);
         });
     });
 
@@ -1078,10 +1086,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const cardWrapper = document.createElement('div');
             cardWrapper.className = 'news-card';
             
-            // 如果有原文链接，添加点击事件
-            if (news.url) {
+            // 如果有原文链接，添加点击事件（处理不同字段名）
+            if (news.url || news.source_url) {
                 cardWrapper.onclick = function() {
-                    window.open(news.url, '_blank');
+                    window.open(news.url || news.source_url, '_blank');
                 };
             }
             
@@ -1131,6 +1139,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
                         <div class="news-date">${dateDisplay}</div>
+                        ${news.source_url ? `<div class="news-source-link">来源: <a href="${news.source_url}" target="_blank">查看原文</a></div>` : ''}
                     </div>
                     ${news.likes || news.retweets || news.followers ? `
                     <div class="news-social-stats">
@@ -1174,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
                         <div class="news-date">${dateDisplay}</div>
+                        ${news.source_url ? `<div class="news-source-link">来源: <a href="${news.source_url}" target="_blank">查看原文</a></div>` : ''}
                     </div>
                     ${news.company || news.funding_round || news.funding_amount || news.investors ? `
                     <div class="news-investment-info">
@@ -1203,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
                         <div class="news-date">${dateDisplay}</div>
+                        ${news.source_url ? `<div class="news-source-link">来源: <a href="${news.source_url}" target="_blank">查看原文</a></div>` : ''}
                     </div>
                 `;
             }
