@@ -1,1 +1,125 @@
-[]
+{
+  "last_check": "2025-03-28 10:34:54",
+  "urls": {
+    "https://news.crunchbase.com/venture/startup-investment-valuation-comparables-gray-equidam/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:35:02"
+    },
+    "https://news.crunchbase.com/ai/human-x-ai-investment-kleiner-bain-primary/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:35:12"
+    },
+    "https://news.crunchbase.com/ai/ma-dealmaking-takes-off-q1-2025-servicenow-coreweave/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:35:24"
+    },
+    "https://news.crunchbase.com/cybersecurity/healthcare-unicorns-ai-february-2025/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:35:35"
+    },
+    "https://news.crunchbase.com/venture/nvda-goog-msft-ai-startup-investment/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:35:44"
+    },
+    "https://news.crunchbase.com/semiconductors-and-5g/ai-chip-global-venture-dollars-down-trade-uncertainty/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:35:54"
+    },
+    "https://news.crunchbase.com/venture/biggest-funding-rounds-ai-semiconductors-flock-celestial/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:36:03"
+    },
+    "https://news.crunchbase.com/ai/infrastructure-nexthop-venture-funding-lightspeed/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:36:15"
+    },
+    "https://news.crunchbase.com/ai/new-unicorns-us-2024-fintech-biotech/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:36:28"
+    },
+    "https://news.crunchbase.com/job-market/tech-jobs-2025-benefits-perks-flexibility/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:36:37"
+    },
+    "https://news.crunchbase.com/ai/personal-identity-legal-fight-solomon-amplify/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:36:47"
+    },
+    "https://news.crunchbase.com/semiconductors-and-5g/chip-startup-celestial-ai-venture-funding-fidelity/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:36:58"
+    },
+    "https://news.crunchbase.com/venture/new-york-startup-funding-slow-q1-2025-ai-ipo-ma-wiz/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:37:08"
+    },
+    "https://news.crunchbase.com/venture/softbank-vision-fund-bounces-back-ai-biotech-cyber-quantum/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:37:20"
+    },
+    "https://news.crunchbase.com/ai/agentic-ai-ecommerce-startup-shopping-schwarzbach-cathay/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:37:29"
+    },
+    "https://news.crunchbase.com/ma/cyber-wiz-goog-massive-deal-ai-doj-regulation/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:37:39"
+    },
+    "https://news.crunchbase.com/ma/softbank-ai-chip-designer-ampere-openai/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:37:48"
+    },
+    "https://news.crunchbase.com/ma/google-bid-wiz-klarna-ipo-ai-big-exits/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:37:57"
+    },
+    "https://news.crunchbase.com/venture/biggest-funding-rounds-it-biotech-ai-nerdio-latigo/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:38:07"
+    },
+    "https://news.crunchbase.com/startups/early-stage-founder-stories-pr-vilnits-beyond/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:38:18"
+    },
+    "https://news.crunchbase.com/ma/servicenow-acquiring-moveworks-ai-unicorn-exit-lightspeed/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:38:28"
+    },
+    "https://news.crunchbase.com/transportation/spacex-value-stable-tesla-spacetechs-plunge-elon-musk/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:38:39"
+    },
+    "https://news.crunchbase.com/ai/big-model-companies-openai-anthropic-mistral-humanx/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:38:49"
+    },
+    "https://news.crunchbase.com/ai/quantum-startup-venture-highmark-february-2025-quera-softbank/": {
+      "scraped": true,
+      "first_seen": "2025-03-28 10:34:54",
+      "last_scraped": "2025-03-28 10:39:00"
+    }
+  }
+}

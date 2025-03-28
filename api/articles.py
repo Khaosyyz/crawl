@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 import datetime
 import pytz
+import logging
 
 # 添加项目根目录到 Python 路径
 project_root = str(Path(__file__).parent.parent)
@@ -20,6 +21,8 @@ except Exception as e:
     mongodb_import_success = False
     mongodb_import_error = str(e)
     mongodb_import_traceback = traceback.format_exc()
+
+logger = logging.getLogger(__name__)
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -63,20 +66,40 @@ class Handler(BaseHTTPRequestHandler):
                 total = db.get_article_count(query)
                 
                 # 计算日期范围
-                today = datetime.datetime.now(pytz.timezone('Asia/Shanghai'))
+                # 先查询数据库中该来源的最新文章日期，而不是依赖系统时间
+                newest_article = db.get_articles(
+                    query={'source': source}, 
+                    limit=1, 
+                    sort=[('date_time', -1)]  # 降序，找最新的文章
+                )
+                
+                if newest_article and newest_article[0].get('date_time'):
+                    try:
+                        reference_date = datetime.datetime.strptime(newest_article[0].get('date_time'), '%Y-%m-%d %H:%M:%S')
+                        logger.info(f"使用数据库中最新文章日期作为参考: {reference_date}")
+                    except Exception as e:
+                        logger.error(f"解析日期失败: {e}, 使用系统时间作为参考")
+                        reference_date = datetime.datetime.now(pytz.timezone('Asia/Shanghai'))
+                else:
+                    # 如果找不到文章或日期为空，则使用系统时间
+                    reference_date = datetime.datetime.now(pytz.timezone('Asia/Shanghai'))
+                    logger.info(f"未找到有效的参考日期，使用系统时间: {reference_date}")
                 
                 # 日期分页处理
-                # 第一页显示今天和昨天的数据，第二页显示前天和大前天，依此类推
+                # 第一页显示最近的数据，第二页显示更早的数据，依此类推
                 start_days_ago = (date_page - 1) * 2
                 end_days_ago = start_days_ago + 2
                 
-                # 计算日期范围
-                start_date = (today - datetime.timedelta(days=end_days_ago)).replace(hour=0, minute=0, second=0, microsecond=0)
-                end_date = (today - datetime.timedelta(days=start_days_ago)).replace(hour=23, minute=59, second=59, microsecond=999999)
+                # 计算日期范围 - 使用参考日期而不是系统时间
+                start_date = (reference_date - datetime.timedelta(days=end_days_ago)).replace(hour=0, minute=0, second=0, microsecond=0)
+                end_date = (reference_date - datetime.timedelta(days=start_days_ago)).replace(hour=23, minute=59, second=59, microsecond=999999)
+                
+                # 确保日期格式正确
+                start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
+                end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
                 
                 # 日期查询范围
-                date_query = {'date_time': {'$gte': start_date.strftime('%Y-%m-%d %H:%M:%S'), 
-                                            '$lte': end_date.strftime('%Y-%m-%d %H:%M:%S')}}
+                date_query = {'date_time': {'$gte': start_date_str, '$lte': end_date_str}}
                 
                 # 合并查询条件
                 query.update(date_query)
@@ -116,7 +139,7 @@ class Handler(BaseHTTPRequestHandler):
                     if oldest_date_str:
                         try:
                             oldest_date = datetime.datetime.strptime(oldest_date_str, '%Y-%m-%d %H:%M:%S')
-                            days_diff = (today - oldest_date).days
+                            days_diff = (reference_date - oldest_date).days
                             total_date_pages = (days_diff // 2) + 1
                         except:
                             total_date_pages = 1
@@ -124,6 +147,16 @@ class Handler(BaseHTTPRequestHandler):
                         total_date_pages = 1
                 else:
                     total_date_pages = 1
+                
+                # 调试记录
+                debug_info = {
+                    'query': query,
+                    'reference_date': reference_date.strftime('%Y-%m-%d'),
+                    'date_range': {
+                        'start': start_date.strftime('%Y-%m-%d'),
+                        'end': end_date.strftime('%Y-%m-%d')
+                    }
+                }
                 
                 # 响应数据
                 response_data = {
@@ -138,7 +171,8 @@ class Handler(BaseHTTPRequestHandler):
                         'start': start_date.strftime('%Y-%m-%d'),
                         'end': end_date.strftime('%Y-%m-%d')
                     },
-                    'data': serializable_articles
+                    'data': serializable_articles,
+                    'debug': debug_info
                 }
                 
                 # 检查是否是 JSONP 请求

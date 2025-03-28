@@ -1,23 +1,23 @@
 {
   "session_data": {
-    "timestamp": "2025-03-27 14:25:26",
+    "timestamp": "2025-03-28 10:37:03",
     "username": "DraytonJou66802",
     "cookies": [
       {
         "domain": ".x.com",
-        "expiry": 1743058518,
+        "expiry": 1743131096,
         "httpOnly": true,
         "name": "__cf_bm",
         "path": "/",
         "sameSite": "None",
         "secure": true,
-        "value": "o8NCyzBuWC8xO7Zj7f6pEAHaebxm8Pom9NYlybwJpRI-1743056718-1.0.1.1-DcN6tYchoyr5Dvlq.LphBIWNo7IDbf42rqPqrAJY9uUer17dPLxvcoGSVs91ccGK0fjVLwUSNPOICv.k9gEUfaRZunsFjg8iZu1LxCGv4zE"
+        "value": "jkC1j7AGoG5P58odh7MrSe4zMGTgwKiBrpWSWEfXBuk-1743129296-1.0.1.1-sgk29XpR_nFpOwrIYBJjUe.nRH__uuOFYFR5_0wYZ91N96t7x4kDUghYsSpXu1qz28FSTndL11iQpF4wBrCnXgKub83De6SVG9jg07wACSs"
       },
       {
         "domain": ".x.com",
-        "expiry": 1776672589,
+        "expiry": 1777689305,
         "httpOnly": false,
-        "name": "guest_id",
+        "name": "guest_id_ads",
         "path": "/",
         "sameSite": "None",
         "secure": true,
@@ -25,42 +25,32 @@
       },
       {
         "domain": ".x.com",
-        "expiry": 1757668220,
-        "httpOnly": false,
-        "name": "d_prefs",
-        "path": "/",
-        "sameSite": "Lax",
-        "secure": true,
-        "value": "MToxLGNvbnNlbnRfdmVyc2lvbjoyLHRleHRfdmVyc2lvbjoxMDAw"
-      },
-      {
-        "domain": ".x.com",
-        "expiry": 1774592724,
-        "httpOnly": false,
-        "name": "twid",
+        "expiry": 1743215704,
+        "httpOnly": true,
+        "name": "att",
         "path": "/",
         "sameSite": "None",
         "secure": true,
-        "value": "u%3D1872474661562277888"
+        "value": "1-TDOhvERvSsP9rg9zisAXPs199aJ7vFCg97hL7iWM"
       },
       {
-        "domain": ".x.com",
+        "domain": "x.com",
         "httpOnly": false,
         "name": "lang",
         "path": "/",
         "sameSite": "Lax",
-        "secure": true,
+        "secure": false,
         "value": "en"
       },
       {
         "domain": ".x.com",
         "expiry": 1777537697,
-        "httpOnly": false,
-        "name": "ct0",
+        "httpOnly": true,
+        "name": "auth_token",
         "path": "/",
         "sameSite": "None",
         "secure": true,
-        "value": "4c77ed2786fe7ff67439b5e85d058ba6c02f149b1808f669f1268e6fb7c9a78e0a84631d9a4965c4f6da0a20ad66be5052ad4d6f34bb1c5c3b6b43233b2b61d1b664263532f5022ab812b5e92a1ebf49"
+        "value": "bd7e44eef67d41a128f75fc8201ec092e4c8cd8b"
       },
       {
         "domain": ".x.com",
@@ -84,27 +74,7 @@
       },
       {
         "domain": ".x.com",
-        "expiry": 1743143124,
-        "httpOnly": true,
-        "name": "att",
-        "path": "/",
-        "sameSite": "None",
-        "secure": true,
-        "value": "1-JZRJ45nQr8spYhAFs0us07mTVostE5cu6JdnMiqU"
-      },
-      {
-        "domain": ".x.com",
-        "expiry": 1777537697,
-        "httpOnly": true,
-        "name": "auth_token",
-        "path": "/",
-        "sameSite": "None",
-        "secure": true,
-        "value": "bd7e44eef67d41a128f75fc8201ec092e4c8cd8b"
-      },
-      {
-        "domain": ".x.com",
-        "expiry": 1777616723,
+        "expiry": 1777689305,
         "httpOnly": false,
         "name": "guest_id_marketing",
         "path": "/",
@@ -114,13 +84,43 @@
       },
       {
         "domain": ".x.com",
-        "expiry": 1777616723,
+        "expiry": 1774665309,
         "httpOnly": false,
-        "name": "guest_id_ads",
+        "name": "twid",
+        "path": "/",
+        "sameSite": "None",
+        "secure": true,
+        "value": "u%3D1872474661562277888"
+      },
+      {
+        "domain": ".x.com",
+        "expiry": 1776672589,
+        "httpOnly": false,
+        "name": "guest_id",
         "path": "/",
         "sameSite": "None",
         "secure": true,
         "value": "v1%3A174211258967069208"
+      },
+      {
+        "domain": ".x.com",
+        "expiry": 1757668220,
+        "httpOnly": false,
+        "name": "d_prefs",
+        "path": "/",
+        "sameSite": "Lax",
+        "secure": true,
+        "value": "MToxLGNvbnNlbnRfdmVyc2lvbjoyLHRleHRfdmVyc2lvbjoxMDAw"
+      },
+      {
+        "domain": ".x.com",
+        "expiry": 1777537697,
+        "httpOnly": false,
+        "name": "ct0",
+        "path": "/",
+        "sameSite": "None",
+        "secure": true,
+        "value": "4c77ed2786fe7ff67439b5e85d058ba6c02f149b1808f669f1268e6fb7c9a78e0a84631d9a4965c4f6da0a20ad66be5052ad4d6f34bb1c5c3b6b43233b2b61d1b664263532f5022ab812b5e92a1ebf49"
       }
     ]
   }

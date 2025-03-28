@@ -274,17 +274,40 @@ import sys
 import time
 import logging
 import importlib.util
+import traceback
 
-# 设置日志记录
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(os.path.join("''' + LOG_DIR + '''", "cleaner_loop.log")),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("cleaner_loop")
+# 日志目录
+LOG_DIR = "''' + LOG_DIR + '''"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# 尝试导入自定义日志处理模块
+try:
+    sys.path.append(LOG_DIR)
+    from log_handler import setup_logger, start_log_cleanup_thread
+    
+    # 配置日志记录
+    logger = setup_logger(
+        name="cleaner_loop",
+        log_file=os.path.join(LOG_DIR, "cleaner_loop.log"),
+        level=logging.INFO,
+        console_output=True
+    )
+    
+    # 启动日志清理线程
+    cleanup_thread = start_log_cleanup_thread(LOG_DIR)
+    
+except ImportError:
+    # 如果导入失败，回退到标准日志配置
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(os.path.join(LOG_DIR, "cleaner_loop.log")),
+            logging.StreamHandler()
+        ]
+    )
+    logger = logging.getLogger("cleaner_loop")
+    logger.warning("无法导入自定义日志处理模块，使用标准日志配置")
 
 # 清洗脚本路径
 CLEANER_SCRIPT = "''' + cleaner_script + '''"
@@ -655,18 +678,38 @@ import schedule
 import logging
 import glob
 
-# 设置日志
+# 日志目录
 log_dir = 'logs'
 os.makedirs(log_dir, exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(log_dir, 'scheduler.log')),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger('scheduler')
+
+# 尝试导入自定义日志处理模块
+try:
+    sys.path.append(log_dir)
+    from log_handler import setup_logger, start_log_cleanup_thread
+    
+    # 配置日志记录
+    logger = setup_logger(
+        name="scheduler",
+        log_file=os.path.join(log_dir, "scheduler.log"),
+        level=logging.INFO,
+        console_output=True
+    )
+    
+    # 启动日志清理线程
+    cleanup_thread = start_log_cleanup_thread(log_dir)
+    
+except ImportError:
+    # 如果导入失败，回退到标准日志配置
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(os.path.join(log_dir, 'scheduler.log')),
+            logging.StreamHandler()
+        ]
+    )
+    logger = logging.getLogger('scheduler')
+    logger.warning("无法导入自定义日志处理模块，使用标准日志配置")
 
 # 记录PID到文件
 SCHEDULER_PID_FILE = os.path.join(log_dir, "scheduler.pid")

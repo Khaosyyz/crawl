@@ -27,9 +27,6 @@ sys.path.append(project_root)
 
 from clean.storage import DataStorage
 
-# 创建全局线程锁用于保护文件操作
-jsonl_lock = threading.Lock()
-
 # 获取项目根目录
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 数据目录
@@ -42,16 +39,37 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(os.path.join(ROOT_DIR, 'clean'), exist_ok=True)
 
-# 设置日志记录
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, "cleandata.log")),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("cleandata")
+# 导入自定义日志处理模块
+try:
+    sys.path.append(LOG_DIR)
+    from log_handler import setup_logger, start_log_cleanup_thread
+    
+    # 配置日志记录
+    logger = setup_logger(
+        name="cleandata",
+        log_file=os.path.join(LOG_DIR, "cleandata.log"),
+        level=logging.INFO,
+        console_output=True
+    )
+    
+    # 启动日志清理线程
+    cleanup_thread = start_log_cleanup_thread(LOG_DIR)
+    
+except ImportError:
+    # 如果导入失败，回退到标准日志配置
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(os.path.join(LOG_DIR, "cleandata.log")),
+            logging.StreamHandler()
+        ]
+    )
+    logger = logging.getLogger("cleandata")
+    logger.warning("无法导入自定义日志处理模块，使用标准日志配置")
+
+# 创建全局线程锁用于保护文件操作
+jsonl_lock = threading.Lock()
 
 # 常量定义
 API_KEY = 'p9mtsT4ioDYm1'
@@ -408,7 +426,7 @@ class XDataProcessor(DataProcessor):
             
             # 验证必要字段 - 如果缺少标题，则使用原始文本生成一个
             if 'title' not in parsed or not parsed['title']:
-                logger.warning("解析结果缺少标题字段，尝试生成标题")
+                logger.info("解析结果缺少标题字段，尝试生成标题")
                 # 使用原始文本的开头作为标题（最多50个字符）
                 raw_text = original_item.get('text', '').strip()
                 if raw_text:
@@ -600,7 +618,7 @@ class CrunchbaseDataProcessor(DataProcessor):
             
             # 验证必要字段 - 如果缺少标题，则尝试从原始数据生成
             if 'title' not in parsed or not parsed['title']:
-                logger.warning("解析结果缺少标题字段，尝试生成标题")
+                logger.info("解析结果缺少标题字段，尝试生成标题")
                 # 首先尝试使用原始文章标题
                 if original_item.get('title'):
                     parsed['title'] = original_item.get('title')
