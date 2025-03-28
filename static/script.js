@@ -587,131 +587,259 @@ document.addEventListener('DOMContentLoaded', function() {
         // 不显示日期导航，以前的代码已被CSS隐藏
         
         console.log('开始创建卡片，日期组:', dateKeys);
-        
-        // 遍历每个日期组
-        dateKeys.forEach(date => {
-            // 创建日期分组标题
-            const dateHeader = document.createElement('div');
-            dateHeader.className = 'date-header';
-            dateHeader.textContent = formatDate(date);
-            dateHeader.dataset.date = date;  // 添加日期数据属性，用于后续处理
-            
-            newsContainer.appendChild(dateHeader);
-        
-            const dateGroup = groupedNewsByDate[date];
-            console.log(`日期 ${date} 的文章数:`, dateGroup.length);
-        
-            // 创建新闻卡片容器
-            const groupContainer = document.createElement('div');
-            groupContainer.className = 'news-group';
-            
-            // 为Crunchbase添加特殊类
-            if (currentSource === 'crunchbase.com') {
-                groupContainer.classList.add('cb-news-group');
-            }
-            
-            groupContainer.dataset.date = date;
-        
-            // 初始显示前N条新闻 (X显示9条，Crunchbase显示3条)
-            const initialCount = currentSource === 'crunchbase.com' ? 3 : 9;
-            const initialNews = dateGroup.slice(0, Math.min(initialCount, dateGroup.length));
-            
-            if (initialNews.length === 0) {
-                console.warn(`日期 ${date} 没有可显示的文章`);
-            }
-            
-            initialNews.forEach((news, index) => {
-                try {
-                    console.log(`创建卡片 ${index+1}/${initialNews.length}，标题:`, news.title);
-                    const newsCard = createNewsCard(news);
-                    if (newsCard) {
-                        groupContainer.appendChild(newsCard);
-                    } else {
-                        console.error('创建卡片失败，返回值为空');
-                    }
-                } catch (error) {
-                    console.error('创建卡片时出错:', error);
-                }
-            });
-            
-            // 检查是否实际添加了卡片
-            if (groupContainer.children.length === 0) {
-                console.warn(`日期 ${date} 的卡片容器为空，未能创建有效卡片`);
-                groupContainer.innerHTML = '<div class="empty-message">此日期没有可显示的内容</div>';
-            }
-        
-            newsContainer.appendChild(groupContainer);
 
-            // 创建按钮容器
-            const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'news-buttons-container';
-            newsContainer.appendChild(buttonContainer);
-
-            // 如果该日期组有超过初始显示数量的新闻，添加"显示更多"按钮
-            if (dateGroup.length > initialCount) {
-                const loadMoreButton = document.createElement('button');
-                loadMoreButton.className = 'load-more-button';
-                loadMoreButton.textContent = `显示更多 (${dateGroup.length - initialCount}条)`;
-                loadMoreButton.dataset.date = date;
+        // 为X标签页实现分页，根据当前页计算需要显示的日期
+        if (currentSource === 'x.com') {
+            // 计算当前页应显示的日期范围
+            const startIndex = (currentPage - 1) * DATES_PER_PAGE;
+            const endIndex = Math.min(startIndex + DATES_PER_PAGE, dateKeys.length);
+            
+            // 获取当前页的日期
+            const currentPageDates = dateKeys.slice(startIndex, endIndex);
+            console.log(`当前页 ${currentPage} 显示日期:`, currentPageDates);
+            
+            // 只遍历当前页的日期
+            currentPageDates.forEach(date => {
+                // 创建日期分组标题
+                const dateHeader = document.createElement('div');
+                dateHeader.className = 'date-header';
+                dateHeader.textContent = formatDate(date);
+                dateHeader.dataset.date = date;  // 添加日期数据属性，用于后续处理
                 
-                // 额外的新闻卡片容器 (用于存放剩余新闻)
-                const extraNewsContainer = document.createElement('div');
-                extraNewsContainer.className = 'extra-news-container';
-                if (currentSource === 'crunchbase.com') {
-                    extraNewsContainer.classList.add('cb-extra-news');
+                newsContainer.appendChild(dateHeader);
+            
+                const dateGroup = groupedNewsByDate[date];
+                console.log(`日期 ${date} 的文章数:`, dateGroup.length);
+            
+                // 创建新闻卡片容器
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'news-group';
+                groupContainer.dataset.date = date;
+            
+                // 初始显示前N条新闻 (X显示9条)
+                const initialCount = 9;
+                const initialNews = dateGroup.slice(0, Math.min(initialCount, dateGroup.length));
+                
+                if (initialNews.length === 0) {
+                    console.warn(`日期 ${date} 没有可显示的文章`);
                 }
-                extraNewsContainer.style.display = 'none'; // 初始隐藏
-                extraNewsContainer.dataset.date = date;
                 
-                // 准备剩余的新闻卡片
-                const remainingNews = dateGroup.slice(initialCount);
-                remainingNews.forEach((news, index) => {
+                initialNews.forEach((news, index) => {
                     try {
-                        console.log(`创建额外卡片 ${index+1}/${remainingNews.length}`);
+                        console.log(`创建卡片 ${index+1}/${initialNews.length}，标题:`, news.title);
                         const newsCard = createNewsCard(news);
                         if (newsCard) {
-                            extraNewsContainer.appendChild(newsCard);
+                            groupContainer.appendChild(newsCard);
+                        } else {
+                            console.error('创建卡片失败，返回值为空');
                         }
                     } catch (error) {
-                        console.error('创建额外卡片时出错:', error);
+                        console.error('创建卡片时出错:', error);
                     }
                 });
                 
-                // 将额外的新闻容器添加到DOM中
-                groupContainer.after(extraNewsContainer);
+                // 检查是否实际添加了卡片
+                if (groupContainer.children.length === 0) {
+                    console.warn(`日期 ${date} 的卡片容器为空，未能创建有效卡片`);
+                    groupContainer.innerHTML = '<div class="empty-message">此日期没有可显示的内容</div>';
+                }
+            
+                newsContainer.appendChild(groupContainer);
+
+                // 创建按钮容器
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'news-buttons-container';
+                newsContainer.appendChild(buttonContainer);
+
+                // 如果该日期组有超过初始显示数量的新闻，添加"显示更多"按钮
+                if (dateGroup.length > initialCount) {
+                    const loadMoreButton = document.createElement('button');
+                    loadMoreButton.className = 'load-more-button';
+                    loadMoreButton.textContent = `显示更多 (${dateGroup.length - initialCount}条)`;
+                    loadMoreButton.dataset.date = date;
+                    
+                    // 额外的新闻卡片容器 (用于存放剩余新闻)
+                    const extraNewsContainer = document.createElement('div');
+                    extraNewsContainer.className = 'extra-news-container';
+                    extraNewsContainer.style.display = 'none'; // 初始隐藏
+                    extraNewsContainer.dataset.date = date;
+                    
+                    // 准备剩余的新闻卡片
+                    const remainingNews = dateGroup.slice(initialCount);
+                    remainingNews.forEach((news, index) => {
+                        try {
+                            console.log(`创建额外卡片 ${index+1}/${remainingNews.length}`);
+                            const newsCard = createNewsCard(news);
+                            if (newsCard) {
+                                extraNewsContainer.appendChild(newsCard);
+                            }
+                        } catch (error) {
+                            console.error('创建额外卡片时出错:', error);
+                        }
+                    });
+                    
+                    // 将额外的新闻容器添加到DOM中
+                    groupContainer.after(extraNewsContainer);
+                    
+                    // 创建收起按钮但初始不显示
+                    const collapseButton = document.createElement('button');
+                    collapseButton.className = 'collapse-button';
+                    collapseButton.textContent = '收起';
+                    collapseButton.dataset.date = date;
+                    collapseButton.style.display = 'none'; // 初始隐藏
+                    
+                    // 点击显示更多按钮时的逻辑
+                    loadMoreButton.onclick = () => {
+                        // 显示额外的新闻
+                        extraNewsContainer.style.display = 'grid';
+                        // 隐藏显示更多按钮
+                        loadMoreButton.style.display = 'none';
+                        // 显示收起按钮
+                        collapseButton.style.display = 'block';
+                    };
+                    
+                    // 点击收起按钮时的逻辑
+                    collapseButton.onclick = () => {
+                        // 隐藏额外的新闻
+                        extraNewsContainer.style.display = 'none';
+                        // 显示显示更多按钮
+                        loadMoreButton.style.display = 'block';
+                        // 隐藏收起按钮
+                        collapseButton.style.display = 'none';
+                    };
+                    
+                    // 添加按钮到按钮容器
+                    buttonContainer.appendChild(loadMoreButton);
+                    buttonContainer.appendChild(collapseButton);
+                }
+            });
+        } else {
+            // Crunchbase的原始渲染逻辑
+            // 遍历每个日期组
+            dateKeys.forEach(date => {
+                // 创建日期分组标题
+                const dateHeader = document.createElement('div');
+                dateHeader.className = 'date-header';
+                dateHeader.textContent = formatDate(date);
+                dateHeader.dataset.date = date;  // 添加日期数据属性，用于后续处理
                 
-                // 创建收起按钮但初始不显示
-                const collapseButton = document.createElement('button');
-                collapseButton.className = 'collapse-button';
-                collapseButton.textContent = '收起';
-                collapseButton.dataset.date = date;
-                collapseButton.style.display = 'none'; // 初始隐藏
+                newsContainer.appendChild(dateHeader);
+            
+                const dateGroup = groupedNewsByDate[date];
+                console.log(`日期 ${date} 的文章数:`, dateGroup.length);
+            
+                // 创建新闻卡片容器
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'news-group';
                 
-                // 点击显示更多按钮时的逻辑
-                loadMoreButton.onclick = () => {
-                    // 显示额外的新闻
-                    extraNewsContainer.style.display = 'grid';
-                    // 隐藏显示更多按钮
-                    loadMoreButton.style.display = 'none';
-                    // 显示收起按钮
-                    collapseButton.style.display = 'block';
-                };
+                // 为Crunchbase添加特殊类
+                if (currentSource === 'crunchbase.com') {
+                    groupContainer.classList.add('cb-news-group');
+                }
                 
-                // 点击收起按钮时的逻辑
-                collapseButton.onclick = () => {
-                    // 隐藏额外的新闻
-                    extraNewsContainer.style.display = 'none';
-                    // 显示显示更多按钮
-                    loadMoreButton.style.display = 'block';
-                    // 隐藏收起按钮
-                    collapseButton.style.display = 'none';
-                };
+                groupContainer.dataset.date = date;
+            
+                // 初始显示前N条新闻 (Crunchbase显示3条)
+                const initialCount = 3;
+                const initialNews = dateGroup.slice(0, Math.min(initialCount, dateGroup.length));
                 
-                // 添加按钮到按钮容器
-                buttonContainer.appendChild(loadMoreButton);
-                buttonContainer.appendChild(collapseButton);
-            }
-        });
+                if (initialNews.length === 0) {
+                    console.warn(`日期 ${date} 没有可显示的文章`);
+                }
+                
+                initialNews.forEach((news, index) => {
+                    try {
+                        console.log(`创建卡片 ${index+1}/${initialNews.length}，标题:`, news.title);
+                        const newsCard = createNewsCard(news);
+                        if (newsCard) {
+                            groupContainer.appendChild(newsCard);
+                        } else {
+                            console.error('创建卡片失败，返回值为空');
+                        }
+                    } catch (error) {
+                        console.error('创建卡片时出错:', error);
+                    }
+                });
+                
+                // 检查是否实际添加了卡片
+                if (groupContainer.children.length === 0) {
+                    console.warn(`日期 ${date} 的卡片容器为空，未能创建有效卡片`);
+                    groupContainer.innerHTML = '<div class="empty-message">此日期没有可显示的内容</div>';
+                }
+            
+                newsContainer.appendChild(groupContainer);
+
+                // 创建按钮容器
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'news-buttons-container';
+                newsContainer.appendChild(buttonContainer);
+
+                // 如果该日期组有超过初始显示数量的新闻，添加"显示更多"按钮
+                if (dateGroup.length > initialCount) {
+                    const loadMoreButton = document.createElement('button');
+                    loadMoreButton.className = 'load-more-button';
+                    loadMoreButton.textContent = `显示更多 (${dateGroup.length - initialCount}条)`;
+                    loadMoreButton.dataset.date = date;
+                    
+                    // 额外的新闻卡片容器 (用于存放剩余新闻)
+                    const extraNewsContainer = document.createElement('div');
+                    extraNewsContainer.className = 'extra-news-container';
+                    if (currentSource === 'crunchbase.com') {
+                        extraNewsContainer.classList.add('cb-extra-news');
+                    }
+                    extraNewsContainer.style.display = 'none'; // 初始隐藏
+                    extraNewsContainer.dataset.date = date;
+                    
+                    // 准备剩余的新闻卡片
+                    const remainingNews = dateGroup.slice(initialCount);
+                    remainingNews.forEach((news, index) => {
+                        try {
+                            console.log(`创建额外卡片 ${index+1}/${remainingNews.length}`);
+                            const newsCard = createNewsCard(news);
+                            if (newsCard) {
+                                extraNewsContainer.appendChild(newsCard);
+                            }
+                        } catch (error) {
+                            console.error('创建额外卡片时出错:', error);
+                        }
+                    });
+                    
+                    // 将额外的新闻容器添加到DOM中
+                    groupContainer.after(extraNewsContainer);
+                    
+                    // 创建收起按钮但初始不显示
+                    const collapseButton = document.createElement('button');
+                    collapseButton.className = 'collapse-button';
+                    collapseButton.textContent = '收起';
+                    collapseButton.dataset.date = date;
+                    collapseButton.style.display = 'none'; // 初始隐藏
+                    
+                    // 点击显示更多按钮时的逻辑
+                    loadMoreButton.onclick = () => {
+                        // 显示额外的新闻
+                        extraNewsContainer.style.display = 'grid';
+                        // 隐藏显示更多按钮
+                        loadMoreButton.style.display = 'none';
+                        // 显示收起按钮
+                        collapseButton.style.display = 'block';
+                    };
+                    
+                    // 点击收起按钮时的逻辑
+                    collapseButton.onclick = () => {
+                        // 隐藏额外的新闻
+                        extraNewsContainer.style.display = 'none';
+                        // 显示显示更多按钮
+                        loadMoreButton.style.display = 'block';
+                        // 隐藏收起按钮
+                        collapseButton.style.display = 'none';
+                    };
+                    
+                    // 添加按钮到按钮容器
+                    buttonContainer.appendChild(loadMoreButton);
+                    buttonContainer.appendChild(collapseButton);
+                }
+            });
+        }
         
         console.log('卡片渲染完成');
         
@@ -801,35 +929,65 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             paginationContainer.appendChild(nextBtn);
         } else {
-            // X标签页使用简单的日期分页
+            // X标签页使用日期分页
+            // 计算总页数 - 每页显示最多两个日期组
+            const totalDatePages = Math.ceil(dateKeys.length / DATES_PER_PAGE);
+            
             // 如果只有一页，不显示分页控件
-            if (dateKeys.length <= 1) {
+            if (totalDatePages <= 1) {
                 paginationContainer.style.display = 'none';
                 return;
             }
             
             paginationContainer.style.display = 'flex';
             
-            // 对于X标签页，简化为上一批/下一批按钮
+            // 前一页按钮
             const prevBtn = document.createElement('button');
-            prevBtn.innerHTML = '&laquo; 前一批';
-            prevBtn.title = '查看前一批资讯';
+            prevBtn.innerHTML = '&laquo;';
+            prevBtn.title = '上一页';
             
-            const nextBtn = document.createElement('button');
-            nextBtn.innerHTML = '后一批 &raquo;';
-            nextBtn.title = '查看下一批资讯';
-            
-            prevBtn.classList.add('disabled'); // 默认禁用前一批
-            nextBtn.classList.add('disabled'); // 默认禁用后一批
-            
+            if (currentPage > 1) {
+                prevBtn.addEventListener('click', () => {
+                    goToPage(currentPage - 1);
+                });
+            } else {
+                prevBtn.classList.add('disabled');
+            }
             paginationContainer.appendChild(prevBtn);
+            
+            // 添加页码按钮
+            for (let i = 1; i <= totalDatePages; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i.toString();
+                if (i === currentPage) {
+                    pageBtn.classList.add('active');
+                } else {
+                    pageBtn.addEventListener('click', () => {
+                        goToPage(i);
+                    });
+                }
+                paginationContainer.appendChild(pageBtn);
+            }
+            
+            // 后一页按钮
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = '&raquo;';
+            nextBtn.title = '下一页';
+            
+            if (currentPage < totalDatePages) {
+                nextBtn.addEventListener('click', () => {
+                    goToPage(currentPage + 1);
+                });
+            } else {
+                nextBtn.classList.add('disabled');
+            }
             paginationContainer.appendChild(nextBtn);
         }
     }
     
     // 跳转到指定页
     function goToPage(page) {
-        if (page < 1 || page > totalPages || page === currentPage) return;
+        if (page < 1 || page === currentPage) return;
         
         currentPage = page;
         // 更新分页控件显示
