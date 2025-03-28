@@ -1135,27 +1135,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 获取日期和时间
             let dateDisplay = "未知日期";
+            let timeDisplay = "";
             if (news.date_time) {
                 try {
-                    dateDisplay = formatDateForDisplay(news.date_time);
+                    // 拆分日期和时间
+                    const dateParts = news.date_time.split(' ');
+                    if (dateParts.length >= 2) {
+                        dateDisplay = formatDateForDisplay(dateParts[0]);
+                        timeDisplay = dateParts[1].substring(0, 5); // 只取HH:MM
+                    } else {
+                        dateDisplay = formatDateForDisplay(news.date_time);
+                    }
                 } catch (e) {
                     console.error("Error parsing date in createNewsCard:", e);
                 }
             }
 
-            // 创建可点击的卡片包装器
+            // 创建卡片包装器，移除点击跳转逻辑
             const cardWrapper = document.createElement('div');
             cardWrapper.className = 'news-card';
-            
-            // 如果有原文链接，添加点击事件（处理不同字段名）
-            if (news.url || news.source_url) {
-                cardWrapper.onclick = function() {
-                    window.open(news.url || news.source_url, '_blank');
-                };
-                console.log('添加点击事件，链接:', news.url || news.source_url);
-            } else {
-                console.warn('新闻卡片缺少URL:', news.title);
-            }
             
             // 创建统一的三段式卡片结构
             const cardHeader = document.createElement('div');
@@ -1201,19 +1199,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                 }
                 
-                // 底部信息部分
+                // 底部信息部分 - 移除重复日期、添加按钮、调整社交信息显示
                 cardFooter.innerHTML = `
                     <div class="news-meta">
-                        ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
-                        <div class="news-date">${dateDisplay}</div>
-                        ${news.source_url ? `<div class="news-source-link">来源: <a href="${news.source_url}" target="_blank">查看原文</a></div>` : ''}
+                        ${news.author ? `<div class="news-author">${escapeHTML(news.author)} ${timeDisplay ? `· ${timeDisplay}` : ''}</div>` : ''}
                     </div>
                     ${news.likes || news.retweets || news.followers ? `
                     <div class="news-social-stats">
-                        ${news.likes ? `<span>喜欢: ${formatNumber(news.likes)}</span>` : ''}
-                        ${news.retweets ? `<span>转发: ${formatNumber(news.retweets)}</span>` : ''}
-                        ${news.followers ? `<span>粉丝: ${formatNumber(news.followers)}</span>` : ''}
+                        ${news.followers ? `<span>粉丝: ${formatNumber(news.followers)}</span>` : '<span>-</span>'}
+                        ${news.likes ? `<span>喜欢: ${formatNumber(news.likes)}</span>` : '<span>-</span>'}
+                        ${news.retweets ? `<span>转发: ${formatNumber(news.retweets)}</span>` : '<span>-</span>'}
                     </div>` : ''}
+                    ${news.url || news.source_url ? `
+                    <a href="${news.url || news.source_url}" target="_blank" class="view-original-btn">查看原文</a>
+                    ` : ''}
                 `;
             } else if (news.source === 'Crunchbase' || news.source === 'crunchbase.com') {
                 // Crunchbase卡片内容
@@ -1245,12 +1244,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                 }
                 
-                // 底部信息部分
+                // 底部信息部分 - 移除重复日期、添加按钮
                 cardFooter.innerHTML = `
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
-                        <div class="news-date">${dateDisplay}</div>
-                        ${news.source_url ? `<div class="news-source-link">来源: <a href="${news.source_url}" target="_blank">查看原文</a></div>` : ''}
                     </div>
                     ${news.company || news.funding_round || news.funding_amount || news.investors ? `
                     <div class="news-investment-info">
@@ -1259,6 +1256,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${news.funding_amount ? `<div class="investment-row"><span class="info-label">金额:</span> <span class="info-value">${escapeHTML(news.funding_amount)}</span></div>` : ''}
                         ${news.investors ? `<div class="investment-row"><span class="info-label">投资方:</span> <span class="info-value">${escapeHTML(news.investors)}</span></div>` : ''}
                     </div>` : ''}
+                    ${news.url || news.source_url ? `
+                    <a href="${news.url || news.source_url}" target="_blank" class="view-original-btn">查看原文</a>
+                    ` : ''}
                 `;
             } else {
                 // 默认卡片样式
@@ -1275,13 +1275,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 `;
                 
-                // 底部信息部分
+                // 底部信息部分 - 移除重复日期、添加按钮
                 cardFooter.innerHTML = `
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
-                        <div class="news-date">${dateDisplay}</div>
-                        ${news.source_url ? `<div class="news-source-link">来源: <a href="${news.source_url}" target="_blank">查看原文</a></div>` : ''}
                     </div>
+                    ${news.url || news.source_url ? `
+                    <a href="${news.url || news.source_url}" target="_blank" class="view-original-btn">查看原文</a>
+                    ` : ''}
                 `;
             }
             
@@ -1397,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 事件委托处理
     document.addEventListener('click', function(event) {
-        // 阻止卡片内部元素（如按钮）点击事件触发卡片的点击事件
+        // 处理内容展开/收起逻辑
         if (event.target.className === 'toggle-content-btn') {
             event.stopPropagation();
             

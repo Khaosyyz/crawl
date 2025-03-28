@@ -326,11 +326,84 @@ footer {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-/* Crunchbase特定的特殊容器 */
+/* Crunchbase特定的特殊容器 - 修改为一行一个卡片 */
 .cb-news-group, .cb-extra-news {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: 1fr;  /* 改为一列 */
     gap: 20px;
+    width: 100%;
+}
+
+/* 调整Crunchbase卡片样式使其与时间标签页对齐 */
+.cb-news-group .news-card, .cb-extra-news .news-card {
+    max-width: 100%;
+}
+
+/* 调整显示全部按钮样式 */
+.toggle-content-btn {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 6px 15px;
+    background-color: #f5f8fa;
+    color: #1a91da;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    border: 1px solid #e1e8ed;
+    text-align: center;
+}
+
+.toggle-content-btn:hover {
+    background-color: #e8f5fe;
+    color: #0c7abf;
+}
+
+/* 社交统计样式 - 适用于X */
+.news-social-stats {
+    display: flex;
+    justify-content: space-between;
+    background-color: #f9fbff;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+    border: 1px solid #e6ecf5;
+}
+
+.news-social-stats span {
+    font-size: 0.85rem;
+    color: #536471;
+    flex: 1;
+    text-align: center;
+    padding: 0 5px;
+}
+
+/* 查看原文按钮样式 */
+.view-original-btn {
+    display: inline-block;
+    margin-top: 15px;
+    padding: 8px 20px;
+    background-color: #1d9bf0;
+    color: white;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    border: none;
+    text-align: center;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.view-original-btn:hover {
+    background-color: #1a8cd8;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(29, 155, 240, 0.3);
+}
+
+/* 覆盖卡片hover样式，移除点击跳转提示 */
+.news-card:hover::after {
+    content: none;
 }
 
 /* 统一内容显示样式 */
@@ -812,24 +885,6 @@ footer {
     font-size: 0.9rem;
     flex: 1;
     word-break: break-word;
-}
-
-/* 社交统计样式 - 适用于X */
-.news-social-stats {
-    display: flex;
-    justify-content: space-between;
-    background-color: #f9fbff;
-    padding: 12px 15px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    border: 1px solid #e6ecf5;
-}
-
-.news-social-stats span {
-    font-size: 0.85rem;
-    color: #536471;
-    display: flex;
-    align-items: center;
 }
 
 /* 元数据样式 */
