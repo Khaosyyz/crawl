@@ -56,6 +56,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let crunchbaseDisplayCount = 3;
     let crunchbaseNews = [];
     let currentDatePage = 1;
+    // 全局变量
+    let lastError = null;
 
     // 设置X标签为默认选中
     if (tabButtons.length > 0) {
@@ -158,90 +160,141 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 获取数据函数
-    function fetchData() {
-        // 标记为正在加载
-        isLoading = true;
-        
-        // 显示加载状态
-        newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
-        
-        // 构建API URL，添加date_page参数和缓存破坏参数
-        const timestamp = new Date().getTime();
-        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_=${timestamp}`;
-        
-        // 执行第一个请求
-        fetchAllPages(apiUrl);
+    // 显示加载状态
+    function showLoading(container) {
+        // 创建加载指示器如果不存在
+        let loadingIndicator = document.getElementById('loading-indicator');
+        if (!loadingIndicator) {
+            loadingIndicator = document.createElement('div');
+            loadingIndicator.id = 'loading-indicator';
+            loadingIndicator.innerHTML = `
+                <div class="spinner"></div>
+                <p>加载中，请稍候...</p>
+            `;
+            container.appendChild(loadingIndicator);
+        } else {
+            loadingIndicator.style.display = 'flex';
+        }
     }
-    
-    // 获取所有页面的数据
-    function fetchAllPages(apiUrl, currentPageNum = 1, allData = []) {
-        fetch(`${apiUrl}&page=${currentPageNum}`, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-        })
+
+    // 隐藏加载状态
+    function hideLoading() {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+    // 显示错误信息
+    function showError(container, errorMessage) {
+        // 创建错误提示如果不存在
+        let errorElement = document.getElementById('error-message');
+        if (!errorElement) {
+            errorElement = document.createElement('div');
+            errorElement.id = 'error-message';
+            errorElement.className = 'error-container';
+            container.appendChild(errorElement);
+        }
+        
+        errorElement.innerHTML = `
+            <p>${errorMessage}</p>
+            <button id="retry-button" class="retry-button">重试</button>
+        `;
+        errorElement.style.display = 'block';
+        
+        // 添加重试按钮事件
+        document.getElementById('retry-button').addEventListener('click', () => {
+            errorElement.style.display = 'none';
+            fetchData();
+        });
+    }
+
+    // 获取新闻数据
+    function fetchData() {
+        // 如果正在加载中则不重复请求
+        if (isLoading) return;
+        
+        isLoading = true;
+        lastError = null;
+        
+        // 获取不同新闻源的容器
+        const xNewsContainer = document.getElementById('x-news-container');
+        const crunchbaseNewsContainer = document.getElementById('crunchbase-news-container');
+        
+        // 显示当前活跃标签的加载状态
+        const activeTab = document.querySelector('.tab-content.active');
+        const activeContainer = activeTab.querySelector('.news-container');
+        showLoading(activeContainer);
+        
+        // 调用适当的获取函数
+        const params = new URLSearchParams(window.location.search);
+        const activeTabId = activeTab.id;
+        
+        if (activeTabId === 'x-tab-content') {
+            fetchCurrentPage('X', xNewsContainer, params.get('page') || 1);
+        } else if (activeTabId === 'crunchbase-tab-content') {
+            fetchCurrentPage('Crunchbase', crunchbaseNewsContainer, null, params.get('date_page') || currentDatePage || 1);
+        }
+    }
+
+    // 获取当前页数据
+    function fetchCurrentPage(source, container, page = 1, datePage = 1) {
+        // 构建URL，添加时间戳防止缓存
+        let apiUrl = `/api/articles?source=${source}&cache_buster=${Date.now()}`;
+        
+        // 根据来源添加适当的参数
+        if (source === 'X') {
+            apiUrl += `&page=${page}`;
+        } else if (source === 'Crunchbase') {
+            apiUrl += `&date_page=${datePage}`;
+            currentDatePage = parseInt(datePage);
+        }
+        
+        // 设置超时
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('请求超时，请检查网络连接')), 30000)
+        );
+        
+        // 发起请求并处理超时
+        Promise.race([
+            fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            }),
+            timeoutPromise
+        ])
         .then(response => {
-            // 检查HTTP状态
             if (!response.ok) {
-                throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+                throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
             }
             return response.json();
         })
-        .then(result => {
-            if (result.status === 'error') {
-                showError(result.message);
-                return;
-            }
-            
-            // 将当前页面的数据添加到累积数据中
-            const combinedData = [...allData, ...result.data];
-            
-            // 更新总页数
-            totalPages = result.total_date_pages;
-            
-            // 如果总数大于9且当前页数小于总页数，获取下一页数据
-            const total = result.total;
-            const perPage = result.per_page;
-            const totalNumPages = Math.ceil(total / perPage);
-            
-            if (currentPageNum < totalNumPages) {
-                // 继续获取下一页
-                fetchAllPages(apiUrl, currentPageNum + 1, combinedData);
-            } else {
-                // 所有页面数据获取完毕
-                isLoading = false;
-                
-                // 恢复刷新按钮
-                if (refreshButton) {
-                    refreshButton.disabled = false;
-                    refreshButton.classList.remove('disabled');
+        .then(data => {
+            // 处理数据
+            if (data && data.status === 'success') {
+                // 根据来源显示数据
+                if (source === 'X') {
+                    displayXNews(data);
+                } else if (source === 'Crunchbase') {
+                    displayCrunchbaseNews(data);
                 }
-                
-                // 更新数据
-                allNewsData = combinedData;
-                
-                // 处理并显示数据
-                processAndDisplayNews(allNewsData);
-                
-                // 更新分页控件
-                updatePagination();
+                hideLoading();
+            } else {
+                throw new Error('API返回格式错误或无数据');
             }
         })
         .catch(error => {
-            // 标记加载完成
+            console.error('获取数据失败:', error);
+            lastError = error.message || '获取数据失败，请重试';
+            hideLoading();
+            showError(container, lastError);
+        })
+        .finally(() => {
             isLoading = false;
-            
-            // 恢复刷新按钮
-            if (refreshButton) {
-                refreshButton.disabled = false;
-                refreshButton.classList.remove('disabled');
-            }
-            
-            showError(`获取数据失败: ${error.message}`);
         });
     }
 
@@ -278,13 +331,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             if (filteredResults.length === 0) {
-                showError(`没有和"${query}"相关的资讯`);
+                showError(newsContainer, `没有和"${query}"相关的资讯`);
             } else {
                 // 使用过滤后的结果
                 const sourceFilteredResults = filteredResults.filter(item => item.source === currentSource);
                 
                 if (sourceFilteredResults.length === 0) {
-                    showError(`在${getSourceName(currentSource)}中没有和"${query}"相关的资讯`);
+                    showError(newsContainer, `在${getSourceName(currentSource)}中没有和"${query}"相关的资讯`);
                 } else {
                     // 更新数据
                     allNewsData = sourceFilteredResults;
@@ -297,7 +350,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         } else {
-            showError('请先加载数据，然后再搜索');
+            showError(newsContainer, '请先加载数据，然后再搜索');
         }
     }
 
@@ -327,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const filteredData = filterBySource(allNewsData);
         
         if (filteredData.length === 0) {
-            showError(`暂无${getSourceName(currentSource)}资讯数据`);
+            showError(newsContainer, `暂无${getSourceName(currentSource)}资讯数据`);
         } else {
             // 处理分页
             processAndDisplayNews(filteredData);
@@ -395,7 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(result => {
                     if (result.status === 'error') {
-                        showError(result.message);
+                        showError(newsContainer, result.message);
                         return;
                     }
                     
@@ -409,12 +462,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     displayCurrentPageNews(isSearchResult);
                 })
                 .catch(error => {
-                    showError(`获取数据失败: ${error.message}`);
+                    showError(newsContainer, `获取数据失败: ${error.message}`);
                     console.error('API错误:', error);
                 });
                 return;
             } else {
-                showError(isSearchResult ? '没有找到匹配的结果' : '暂无资讯数据');
+                showError(newsContainer, isSearchResult ? '没有找到匹配的结果' : '暂无资讯数据');
                 return;
             }
         }
@@ -425,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 检查是否有日期数据
         if (dateKeys.length === 0) {
-            showError(isSearchResult ? '没有找到匹配的结果' : '暂无资讯数据');
+            showError(newsContainer, isSearchResult ? '没有找到匹配的结果' : '暂无资讯数据');
             return;
         }
         
@@ -443,7 +496,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentDatePage--;
                     // 强制重新获取数据
                     allNewsData = [];
-                    displayCurrentPageNews();
+                    // 强制调用获取数据函数
+                    fetchData();
+                    window.scrollTo(0, 0);
                 });
                 dateNavContainer.appendChild(prevDateBtn);
             }
@@ -463,7 +518,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentDatePage++;
                     // 强制重新获取数据
                     allNewsData = [];
-                    displayCurrentPageNews();
+                    // 强制调用获取数据函数
+                    fetchData();
+                    window.scrollTo(0, 0);
                 });
                 dateNavContainer.appendChild(nextDateBtn);
             }
@@ -590,7 +647,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentDatePage--;
                     // 强制重新获取数据
                     allNewsData = [];
-                    displayCurrentPageNews();
+                    // 强制调用获取数据函数
+                    fetchData();
                     window.scrollTo(0, 0);
                 });
             } else {
@@ -615,7 +673,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentDatePage = 1;
                     // 强制重新获取数据
                     allNewsData = [];
-                    displayCurrentPageNews();
+                    // 强制调用获取数据函数
+                    fetchData();
                     window.scrollTo(0, 0);
                 });
                 paginationContainer.appendChild(firstBtn);
@@ -640,7 +699,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         currentDatePage = i;
                         // 强制重新获取数据
                         allNewsData = [];
-                        displayCurrentPageNews();
+                        // 强制调用获取数据函数
+                        fetchData();
                         window.scrollTo(0, 0);
                     });
                 }
@@ -663,7 +723,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentDatePage = totalPages;
                     // 强制重新获取数据
                     allNewsData = [];
-                    displayCurrentPageNews();
+                    // 强制调用获取数据函数
+                    fetchData();
                     window.scrollTo(0, 0);
                 });
                 paginationContainer.appendChild(lastBtn);
@@ -679,7 +740,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentDatePage++;
                     // 强制重新获取数据
                     allNewsData = [];
-                    displayCurrentPageNews();
+                    // 强制调用获取数据函数
+                    fetchData();
                     window.scrollTo(0, 0);
                 });
             } else {
@@ -836,6 +898,50 @@ document.addEventListener('DOMContentLoaded', function() {
         return timePart;
     }
 
+    // 安全地从日期字符串中获取日期部分
+    function getDateFromString(dateString) {
+        try {
+            // 检查日期字符串是否有效
+            if (!dateString) return null;
+            
+            // 尝试提取日期部分 (YYYY-MM-DD)
+            const match = dateString.match(/^\d{4}-\d{2}-\d{2}/);
+            if (match) {
+                return match[0];
+            }
+            
+            // 尝试创建日期对象并格式化
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) {
+                return date.toISOString().split('T')[0];
+            }
+            
+            return null;
+        } catch (e) {
+            console.error("Error parsing date:", e);
+            return null;
+        }
+    }
+
+    // 格式化日期显示
+    function formatDateForDisplay(dateString) {
+        try {
+            if (!dateString) return "未知日期";
+            
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+            
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            
+            return `${year}年${month}月${day}日`;
+        } catch (e) {
+            console.error("Error formatting date:", e);
+            return dateString;
+        }
+    }
+
     // 格式化日期显示
     function formatDate(dateStr) {
         if (!dateStr || dateStr === '未知日期') return dateStr;
@@ -882,122 +988,82 @@ document.addEventListener('DOMContentLoaded', function() {
     // 创建单个新闻卡片
     function createNewsCard(news) {
         try {
-            const card = document.createElement('article');
-            card.className = 'news-card';
-            
-            // 获取新闻数据，适配新的 API 数据结构
-            const source = news.source || '';
-            const sourceUrl = news.source_url || '';
-            const title = news.title || '';
-            const content = news.content || '';
-            const dateTime = news.date_time || '';
-            let author = news.author || '';
-            
-            // 提取日期和时间部分
-            const dateStr = extractDate(dateTime);
-            const timeStr = extractTime(dateTime);
-            
-            // 构建通用卡片结构
-            let cardHTML = '';
-            
-            // 第一部分：标题
-            if (title) {
-                cardHTML += `<h3 class="news-title">${escapeHtml(title)}</h3>`;
-            }
-            
-            // 第二部分：内容 (使用折叠式布局)
-            cardHTML += `<div class="news-content collapsed">${formatContent(content)}</div>`;
-            cardHTML += '<div class="content-toggle" onclick="this.previousElementSibling.classList.toggle(\'collapsed\'); this.textContent = this.previousElementSibling.classList.contains(\'collapsed\') ? \'显示全部\' : \'收起内容\';">显示全部</div>';
-            
-            // 第三部分：元数据
-            cardHTML += '<div class="news-footer">';
-            
-            // 添加作者信息
-            if (author) {
-                cardHTML += `<div class="news-author">作者: ${escapeHtml(author)}</div>`;
-            }
-            
-            // 如果是Crunchbase数据，添加投资信息
-            if (source === 'crunchbase.com') {
-                cardHTML += '<div class="news-investment-info">';
-                
-                // 公司信息
-                if (news.company && news.company !== '未提供') {
-                    cardHTML += `<div class="investment-row">
-                        <span class="info-label">公司:</span>
-                        <span class="info-value">${escapeHtml(news.company)}</span>
-                    </div>`;
-                }
-                
-                // 融资轮次
-                if (news.funding_round && news.funding_round !== '未提供') {
-                    cardHTML += `<div class="investment-row">
-                        <span class="info-label">融资轮次:</span>
-                        <span class="info-value">${escapeHtml(news.funding_round)}</span>
-                    </div>`;
-                }
-                
-                // 融资金额
-                if (news.funding_amount && news.funding_amount !== '未提供') {
-                    cardHTML += `<div class="investment-row">
-                        <span class="info-label">融资金额:</span>
-                        <span class="info-value">${escapeHtml(news.funding_amount)}</span>
-                    </div>`;
-                }
-                
-                // 投资方
-                if (news.investors && news.investors !== '未提供') {
-                    cardHTML += `<div class="investment-row">
-                        <span class="info-label">投资方:</span>
-                        <span class="info-value">${escapeHtml(news.investors)}</span>
-                    </div>`;
-                }
-                
-                cardHTML += '</div>'; // 结束 news-investment-info
-            }
-            
-            // 如果是X数据，添加社交统计
-            if (source === 'x.com') {
-                // 使用正确的字段名来获取统计数据
-                let followersCount = news.followers || news.followers_count || 0;
-                let favoriteCount = news.likes || news.favorite_count || 0;
-                let retweetCount = news.retweets || news.retweet_count || 0;
-                
-                // 第二行：社交数据 (粉丝、点赞、转发)
-                cardHTML += '<div class="news-social-stats">';
-                cardHTML += `<span>粉丝数量：${formatNumber(followersCount)}</span>`;
-                cardHTML += `<span>点赞数量：${formatNumber(favoriteCount)}</span>`;
-                cardHTML += `<span>转发数量：${formatNumber(retweetCount)}</span>`;
-                cardHTML += '</div>';
-            }
-            
-            // 添加日期和来源链接
-            cardHTML += `<div class="news-meta">
-                <div class="news-date">发布时间: ${formatDate(dateTime)}</div>
-                <div class="news-source-link">原文链接: <a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>
-            </div>`;
-            
-            cardHTML += '</div>'; // 结束 news-footer
-            
-            // 设置卡片内容
-            card.innerHTML = cardHTML;
-            
-            return card;
-        } catch (e) {
-            console.error('创建新闻卡片出错:', e, news);
-            const card = document.createElement('article');
-            card.className = 'news-card error-card';
-            card.innerHTML = '<div class="error-message">无法显示此条资讯</div>';
-            return card;
-        }
-    }
+            if (!news) return '';
 
-    // 显示错误信息
-    function showError(message) {
-        if (newsContainer) {
-            newsContainer.innerHTML = `<div class="loading">${message}</div>`;
-        } else {
-            console.error('无法显示错误信息:', message);
+            // 获取日期和时间
+            let dateDisplay = "未知日期";
+            if (news.date_time) {
+                try {
+                    dateDisplay = formatDateForDisplay(news.date_time);
+                } catch (e) {
+                    console.error("Error parsing date in createNewsCard:", e);
+                }
+            }
+
+            let html = '';
+            
+            if (news.source === 'Twitter' || news.source === 'X') {
+                // X/Twitter卡片样式
+                // ... existing code ...
+            } else if (news.source === 'Crunchbase') {
+                // Crunchbase卡片样式
+                const title = escapeHTML(news.title) || '无标题';
+                const content = escapeHTML(news.content) || '无内容';
+                
+                // 收起超过200字符的内容
+                const isLongContent = content.length > 200;
+                const displayContent = isLongContent ? content.substring(0, 200) + '...' : content;
+                
+                html = `
+                <div class="crunchbase-news">
+                    <div class="news-title">
+                        <h2>${title}</h2>
+                    </div>
+                    
+                    <div class="news-content">
+                        <p class="content-text${isLongContent ? ' collapsed' : ''}">${displayContent}</p>
+                        ${isLongContent ? `
+                        <div class="full-content" style="display: none;">
+                            <p>${content}</p>
+                        </div>
+                        <button class="toggle-content-btn">显示全部</button>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="news-footer">
+                        <div class="news-metadata">
+                            <span class="news-source">${news.source}</span>
+                            <span class="news-date">${dateDisplay}</span>
+                            ${news.url ? `<a href="${news.url}" target="_blank" class="news-link">原文链接</a>` : ''}
+                        </div>
+                        
+                        ${news.author ? `
+                        <div class="author-info">
+                            <span class="author-label">作者:</span>
+                            <span class="author-name">${escapeHTML(news.author)}</span>
+                        </div>
+                        ` : ''}
+                        
+                        ${news.company || news.funding_round || news.funding_amount || news.investors ? `
+                        <div class="investment-info">
+                            ${news.company ? `<div class="company"><span>公司:</span> ${escapeHTML(news.company)}</div>` : ''}
+                            ${news.funding_round ? `<div class="round"><span>轮次:</span> ${escapeHTML(news.funding_round)}</div>` : ''}
+                            ${news.funding_amount ? `<div class="amount"><span>金额:</span> ${escapeHTML(news.funding_amount)}</div>` : ''}
+                            ${news.investors ? `<div class="investors"><span>投资方:</span> ${escapeHTML(news.investors)}</div>` : ''}
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                `;
+            } else {
+                // 默认卡片样式
+                // ... existing code ...
+            }
+            
+            return html;
+        } catch (error) {
+            console.error("Error creating news card:", error);
+            return '';
         }
     }
 
@@ -1094,4 +1160,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始检查
     checkScrollPosition();
+
+    // 添加事件委托来处理"显示全部"按钮点击
+    document.addEventListener('click', function(event) {
+        // 检查点击的是否是toggle-content-btn按钮
+        if (event.target && event.target.classList.contains('toggle-content-btn')) {
+            const contentContainer = event.target.closest('.news-content');
+            const collapsedText = contentContainer.querySelector('.content-text');
+            const fullContent = contentContainer.querySelector('.full-content');
+            
+            if (fullContent.style.display === 'none') {
+                // 展开内容
+                collapsedText.style.display = 'none';
+                fullContent.style.display = 'block';
+                event.target.textContent = '收起内容';
+            } else {
+                // 收起内容
+                collapsedText.style.display = 'block';
+                fullContent.style.display = 'none';
+                event.target.textContent = '显示全部';
+            }
+        }
+    });
 });
