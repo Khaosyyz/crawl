@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     allNewsData = JSON.parse(cachedData);
                     isLoading = false;
                     hideLoading();
-                    processAndDisplayData();
+                    processAndDisplayNews(allNewsData);
                     return;
                 } else {
                     console.log(`缓存已过期，缓存年龄: ${cacheAge.toFixed(2)}分钟`);
@@ -311,14 +311,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // 处理和显示数据
-                    processAndDisplayData();
+                    processAndDisplayNews(data.data);
                 })
                 .catch(error => {
                     // 如果API请求失败，但有缓存数据，使用缓存数据
                     if (cachedData) {
                         console.log("API请求失败，使用可能过期的缓存数据");
                         allNewsData = JSON.parse(cachedData);
-                        processAndDisplayData();
+                        processAndDisplayNews(allNewsData);
                         
                         // 显示轻微的错误提示
                         const warningBar = document.createElement('div');
