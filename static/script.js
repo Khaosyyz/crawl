@@ -1096,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cardFooter.className = 'news-card-footer';
             
             // 根据来源填充内容
-            if (news.source === 'Twitter' || news.source === 'X') {
+            if (news.source === 'Twitter' || news.source === 'X' || news.source === 'x.com') {
                 // X/Twitter卡片内容
                 const title = escapeHTML(news.title) || '无标题';
                 const content = formatContent(escapeHTML(news.content) || '无内容');
@@ -1139,7 +1139,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${news.followers ? `<span>粉丝: ${formatNumber(news.followers)}</span>` : ''}
                     </div>` : ''}
                 `;
-            } else if (news.source === 'Crunchbase') {
+            } else if (news.source === 'Crunchbase' || news.source === 'crunchbase.com') {
                 // Crunchbase卡片内容
                 const title = escapeHTML(news.title) || '无标题';
                 const content = escapeHTML(news.content) || '无内容';
