@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Crunchbase 显示更多相关变量
     let crunchbaseDisplayCount = 3;
     let crunchbaseNews = [];
+    let currentDatePage = 1;
 
     // 设置X标签为默认选中
     if (tabButtons.length > 0) {
@@ -363,31 +364,187 @@ document.addEventListener('DOMContentLoaded', function() {
         // 清空现有内容
         newsContainer.innerHTML = '';
 
-        // 显示指定数量的新闻
-        const displayNews = crunchbaseNews.slice(0, crunchbaseDisplayCount);
-        displayNews.forEach(news => {
-            const newsCard = createNewsCard(news);
-            newsContainer.appendChild(newsCard);
+        // 如果没有数据
+        if (!crunchbaseNews || crunchbaseNews.length === 0) {
+            showError('暂无 Crunchbase 资讯数据');
+            return;
+        }
+
+        // 按日期分组数据
+        let dateGroups = {};
+        crunchbaseNews.forEach(news => {
+            // 提取日期部分 (YYYY-MM-DD)
+            const dateStr = news.date_time ? news.date_time.split(' ')[0] : 'unknown';
+            if (!dateGroups[dateStr]) {
+                dateGroups[dateStr] = [];
+            }
+            dateGroups[dateStr].push(news);
         });
 
-        // 如果还有更多新闻，显示"显示更多"按钮
-        if (crunchbaseDisplayCount < crunchbaseNews.length) {
-            const loadMoreButton = document.createElement('button');
-            loadMoreButton.className = 'load-more-button';
-            loadMoreButton.textContent = '显示更多';
-            loadMoreButton.onclick = () => {
-                crunchbaseDisplayCount += 3;
-                displayCrunchbaseNews();
-            };
-            newsContainer.appendChild(loadMoreButton);
+        // 获取所有日期并降序排序
+        let allDates = Object.keys(dateGroups).sort().reverse();
+        
+        // 总日期页数
+        const totalDatePages = Math.ceil(allDates.length / 3);
+        
+        // 确保当前日期页在有效范围内
+        if (currentDatePage < 1) currentDatePage = 1;
+        if (currentDatePage > totalDatePages) currentDatePage = totalDatePages;
+        
+        // 创建日期导航
+        const dateNavContainer = document.createElement('div');
+        dateNavContainer.className = 'date-tab-navigation';
+        
+        // 添加日期页导航按钮
+        if (totalDatePages > 1) {
+            // 前一日期页按钮
+            if (currentDatePage > 1) {
+                const prevDateBtn = document.createElement('button');
+                prevDateBtn.className = 'date-page-btn prev-date';
+                prevDateBtn.textContent = '前几天';
+                prevDateBtn.addEventListener('click', () => {
+                    currentDatePage--;
+                    displayCrunchbaseNews();
+                });
+                dateNavContainer.appendChild(prevDateBtn);
+            }
+            
+            // 显示当前页/总页
+            const pageInfo = document.createElement('div');
+            pageInfo.className = 'date-page-info';
+            pageInfo.textContent = `${currentDatePage} / ${totalDatePages}`;
+            dateNavContainer.appendChild(pageInfo);
+            
+            // 后一日期页按钮
+            if (currentDatePage < totalDatePages) {
+                const nextDateBtn = document.createElement('button');
+                nextDateBtn.className = 'date-page-btn next-date';
+                nextDateBtn.textContent = '后几天';
+                nextDateBtn.addEventListener('click', () => {
+                    currentDatePage++;
+                    displayCrunchbaseNews();
+                });
+                dateNavContainer.appendChild(nextDateBtn);
+            }
         }
+        
+        newsContainer.appendChild(dateNavContainer);
+        
+        // 计算当前日期页应显示的日期
+        const startIdx = (currentDatePage - 1) * 3;
+        const endIdx = Math.min(startIdx + 3, allDates.length);
+        const currentDates = allDates.slice(startIdx, endIdx);
+        
+        // 遍历当前页的每个日期组
+        currentDates.forEach(dateStr => {
+            // 创建日期标题
+            const dateHeader = document.createElement('div');
+            dateHeader.className = 'date-header';
+            dateHeader.textContent = formatDate(dateStr);
+            newsContainer.appendChild(dateHeader);
+            
+            // 创建当前日期的新闻组容器
+            const dateNewsContainer = document.createElement('div');
+            dateNewsContainer.className = 'news-group crunchbase-style';
+            
+            // 获取该日期的新闻 (每个日期最多展示3条)
+            const dateNews = dateGroups[dateStr].slice(0, 3);
+            dateNews.forEach(news => {
+                const newsCard = createNewsCard(news);
+                dateNewsContainer.appendChild(newsCard);
+            });
+            
+            newsContainer.appendChild(dateNewsContainer);
+            
+            // 如果该日期有超过3条新闻，添加"查看更多"按钮
+            if (dateGroups[dateStr].length > 3) {
+                const moreBtn = document.createElement('div');
+                moreBtn.className = 'expand-button';
+                const moreLink = document.createElement('button');
+                moreLink.textContent = `查看更多 (${dateGroups[dateStr].length - 3}条)`;
+                
+                // 创建隐藏容器，存放剩余新闻
+                const hiddenContainer = document.createElement('div');
+                hiddenContainer.className = 'hidden-news crunchbase-style';
+                hiddenContainer.style.display = 'none';
+                
+                // 添加剩余新闻
+                dateGroups[dateStr].slice(3).forEach(news => {
+                    const newsCard = createNewsCard(news);
+                    hiddenContainer.appendChild(newsCard);
+                });
+                
+                // 展开/收起切换逻辑
+                moreLink.addEventListener('click', function() {
+                    if (hiddenContainer.style.display === 'none') {
+                        hiddenContainer.style.display = 'flex';
+                        this.textContent = '收起';
+                    } else {
+                        hiddenContainer.style.display = 'none';
+                        this.textContent = `查看更多 (${dateGroups[dateStr].length - 3}条)`;
+                    }
+                });
+                
+                moreBtn.appendChild(moreLink);
+                newsContainer.appendChild(moreBtn);
+                newsContainer.appendChild(hiddenContainer);
+            }
+        });
 
-        // 隐藏分页控件
+        // 显示分页控件，但修改为针对日期分页
         if (paginationContainer) {
-            paginationContainer.style.display = 'none';
+            // 清空现有分页
+            paginationContainer.innerHTML = '';
+            
+            // 只有在有多个日期页时才显示分页
+            if (totalDatePages > 1) {
+                // 前一页按钮
+                if (currentDatePage > 1) {
+                    const prevBtn = document.createElement('button');
+                    prevBtn.innerHTML = '&laquo;';
+                    prevBtn.addEventListener('click', () => {
+                        currentDatePage--;
+                        displayCrunchbaseNews();
+                        window.scrollTo(0, 0);
+                    });
+                    paginationContainer.appendChild(prevBtn);
+                }
+                
+                // 添加页码按钮
+                for (let i = 1; i <= totalDatePages; i++) {
+                    const pageBtn = document.createElement('button');
+                    pageBtn.textContent = i.toString();
+                    if (i === currentDatePage) {
+                        pageBtn.classList.add('active');
+                    } else {
+                        pageBtn.addEventListener('click', () => {
+                            currentDatePage = i;
+                            displayCrunchbaseNews();
+                            window.scrollTo(0, 0);
+                        });
+                    }
+                    paginationContainer.appendChild(pageBtn);
+                }
+                
+                // 后一页按钮
+                if (currentDatePage < totalDatePages) {
+                    const nextBtn = document.createElement('button');
+                    nextBtn.innerHTML = '&raquo;';
+                    nextBtn.addEventListener('click', () => {
+                        currentDatePage++;
+                        displayCrunchbaseNews();
+                        window.scrollTo(0, 0);
+                    });
+                    paginationContainer.appendChild(nextBtn);
+                }
+                
+                paginationContainer.style.display = 'flex';
+            } else {
+                paginationContainer.style.display = 'none';
+            }
         }
     }
-    
+
     // 更新分页控件
     function updatePagination() {
         if (!paginationContainer) return;
@@ -759,28 +916,73 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 设置卡片内容
                 card.innerHTML = cardHTML;
             } else if (source === 'crunchbase.com') {
-                // 保持 Crunchbase 卡片原有结构不变
+                // 使用三段式结构显示Crunchbase卡片
                 card.classList.add('crunchbase-news');
                 
                 // 构建卡片 HTML
                 let cardHTML = '';
                 
-                // 标题部分（如果有）
+                // 第一段：标题部分
                 if (title) {
                     cardHTML += `<h3 class="news-title">${escapeHtml(title)}</h3>`;
                 }
                 
-                // 内容部分
-                cardHTML += `<div class="news-content">${formatContent(content)}</div>`;
+                // 第二段：内容部分（折叠式）
+                cardHTML += `<div class="news-content collapsed">${formatContent(content)}</div>`;
+                cardHTML += '<div class="content-toggle" onclick="this.previousElementSibling.classList.toggle(\'collapsed\'); this.textContent = this.previousElementSibling.classList.contains(\'collapsed\') ? \'显示全部\' : \'收起内容\';">显示全部</div>';
                 
-                // 元数据部分
-                cardHTML += '<div class="news-meta">';
+                // 第三段：元数据部分
+                cardHTML += '<div class="news-footer">';
                 
-                // 日期和来源
-                cardHTML += `<div class="news-date">${formatDate(dateTime)}</div>`;
-                cardHTML += `<div class="news-source">来源: <a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>`;
+                // 添加作者信息（如果有）
+                if (author) {
+                    cardHTML += `<div class="news-author">作者: ${escapeHtml(author)}</div>`;
+                }
                 
-                cardHTML += '</div>'; // 结束 news-meta
+                // 添加Crunchbase特有字段
+                cardHTML += '<div class="news-investment-info">';
+                
+                // 公司信息
+                if (news.company && news.company !== '未提供') {
+                    cardHTML += `<div class="investment-row">
+                        <span class="info-label">公司:</span>
+                        <span class="info-value">${escapeHtml(news.company)}</span>
+                    </div>`;
+                }
+                
+                // 融资轮次
+                if (news.funding_round && news.funding_round !== '未提供') {
+                    cardHTML += `<div class="investment-row">
+                        <span class="info-label">融资轮次:</span>
+                        <span class="info-value">${escapeHtml(news.funding_round)}</span>
+                    </div>`;
+                }
+                
+                // 融资金额
+                if (news.funding_amount && news.funding_amount !== '未提供') {
+                    cardHTML += `<div class="investment-row">
+                        <span class="info-label">融资金额:</span>
+                        <span class="info-value">${escapeHtml(news.funding_amount)}</span>
+                    </div>`;
+                }
+                
+                // 投资方
+                if (news.investors && news.investors !== '未提供') {
+                    cardHTML += `<div class="investment-row">
+                        <span class="info-label">投资方:</span>
+                        <span class="info-value">${escapeHtml(news.investors)}</span>
+                    </div>`;
+                }
+                
+                cardHTML += '</div>'; // 结束 news-investment-info
+                
+                // 日期和来源链接
+                cardHTML += `<div class="news-meta">
+                    <div class="news-date">发布时间: ${formatDate(dateTime)}</div>
+                    <div class="news-source-link">原文链接: <a href="${sourceUrl}" target="_blank">${formatUrlForDisplay(sourceUrl)}</a></div>
+                </div>`;
+                
+                cardHTML += '</div>'; // 结束 news-footer
                 
                 // 设置卡片内容
                 card.innerHTML = cardHTML;
