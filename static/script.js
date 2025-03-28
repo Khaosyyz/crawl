@@ -584,51 +584,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // 创建日期导航 (仅对Crunchbase显示)
-        if (currentSource === 'crunchbase.com') {
-            const dateNavContainer = document.createElement('div');
-            dateNavContainer.className = 'date-tab-navigation';
-            
-            // 前一日期页按钮
-            if (currentDatePage > 1) {
-                const prevDateBtn = document.createElement('button');
-                prevDateBtn.className = 'date-page-btn prev-date';
-                prevDateBtn.textContent = '前几天';
-                prevDateBtn.addEventListener('click', () => {
-                    currentDatePage--;
-                    // 强制重新获取数据
-                    allNewsData = [];
-                    // 强制调用获取数据函数
-                    fetchData();
-                    window.scrollTo(0, 0);
-                });
-                dateNavContainer.appendChild(prevDateBtn);
-            }
-            
-            // 显示当前页/总页
-            const pageInfo = document.createElement('div');
-            pageInfo.className = 'date-page-info';
-            pageInfo.textContent = `${currentDatePage} / ${totalPages}`;
-            dateNavContainer.appendChild(pageInfo);
-            
-            // 后一日期页按钮
-            if (currentDatePage < totalPages) {
-                const nextDateBtn = document.createElement('button');
-                nextDateBtn.className = 'date-page-btn next-date';
-                nextDateBtn.textContent = '后几天';
-                nextDateBtn.addEventListener('click', () => {
-                    currentDatePage++;
-                    // 强制重新获取数据
-                    allNewsData = [];
-                    // 强制调用获取数据函数
-                    fetchData();
-                    window.scrollTo(0, 0);
-                });
-                dateNavContainer.appendChild(nextDateBtn);
-            }
-            
-            newsContainer.appendChild(dateNavContainer);
-        }
+        // 不显示日期导航，以前的代码已被CSS隐藏
         
         console.log('开始创建卡片，日期组:', dateKeys);
         
@@ -649,7 +605,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const groupContainer = document.createElement('div');
             groupContainer.className = 'news-group';
             
-            // 为Crunchbase添加特殊类，但使用与X相同的布局
+            // 为Crunchbase添加特殊类
             if (currentSource === 'crunchbase.com') {
                 groupContainer.classList.add('cb-news-group');
             }
@@ -763,7 +719,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updatePagination();
     }
 
-    // 更新分页控件 - 修改让所有来源共用同一逻辑
+    // 更新分页控件 - 修复分页逻辑问题
     function updatePagination() {
         if (!paginationContainer) return;
         
@@ -771,6 +727,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 如果是Crunchbase，使用date_page分页
         if (currentSource === 'crunchbase.com') {
+            // 设置Crunchbase特有的分页逻辑
+            if (totalPages <= 1) {
+                paginationContainer.style.display = 'none';
+                return;
+            }
+            
+            paginationContainer.style.display = 'flex';
+            
             // 前一页按钮
             const prevBtn = document.createElement('button');
             prevBtn.innerHTML = '&laquo;';
@@ -790,36 +754,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             paginationContainer.appendChild(prevBtn);
             
-            // 确定要显示的页码范围
+            // 最多显示5个页码按钮
             let startPage = Math.max(1, currentDatePage - 2);
             let endPage = Math.min(totalPages, startPage + 4);
             
             // 调整起始页以确保显示5个页码按钮（如果有这么多页）
             if (endPage - startPage < 4 && totalPages > 5) {
                 startPage = Math.max(1, endPage - 4);
-            }
-            
-            // 添加第一页按钮（如果不在显示范围内）
-            if (startPage > 1) {
-                const firstBtn = document.createElement('button');
-                firstBtn.textContent = '1';
-                firstBtn.addEventListener('click', () => {
-                    currentDatePage = 1;
-                    // 强制重新获取数据
-                    allNewsData = [];
-                    // 强制调用获取数据函数
-                    fetchData();
-                    window.scrollTo(0, 0);
-                });
-                paginationContainer.appendChild(firstBtn);
-                
-                // 添加省略号（如果需要）
-                if (startPage > 2) {
-                    const ellipsis = document.createElement('button');
-                    ellipsis.textContent = '...';
-                    ellipsis.classList.add('disabled');
-                    paginationContainer.appendChild(ellipsis);
-                }
             }
             
             // 添加页码按钮
@@ -841,29 +782,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 paginationContainer.appendChild(pageBtn);
             }
             
-            // 添加省略号和最后一页按钮（如果需要）
-            if (endPage < totalPages) {
-                // 添加省略号（如果需要）
-                if (endPage < totalPages - 1) {
-                    const ellipsis = document.createElement('button');
-                    ellipsis.textContent = '...';
-                    ellipsis.classList.add('disabled');
-                    paginationContainer.appendChild(ellipsis);
-                }
-                
-                const lastBtn = document.createElement('button');
-                lastBtn.textContent = totalPages.toString();
-                lastBtn.addEventListener('click', () => {
-                    currentDatePage = totalPages;
-                    // 强制重新获取数据
-                    allNewsData = [];
-                    // 强制调用获取数据函数
-                    fetchData();
-                    window.scrollTo(0, 0);
-                });
-                paginationContainer.appendChild(lastBtn);
-            }
-            
             // 后一页按钮
             const nextBtn = document.createElement('button');
             nextBtn.innerHTML = '&raquo;';
@@ -883,87 +801,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             paginationContainer.appendChild(nextBtn);
         } else {
-            // X标签页的原始分页逻辑保持不变
+            // X标签页使用简单的日期分页
+            // 如果只有一页，不显示分页控件
+            if (dateKeys.length <= 1) {
+                paginationContainer.style.display = 'none';
+                return;
+            }
             
-            // 如果总页数小于等于1，不显示分页控件
-            if (totalPages <= 1) return;
+            paginationContainer.style.display = 'flex';
             
-            // 添加上一页按钮
+            // 对于X标签页，简化为上一批/下一批按钮
             const prevBtn = document.createElement('button');
-            prevBtn.innerHTML = '&laquo;';
-            prevBtn.title = '上一页';
-            prevBtn.classList.add(currentPage === 1 ? 'disabled' : 'prev-page');
-            if (currentPage !== 1) {
-                prevBtn.addEventListener('click', () => goToPage(currentPage - 1));
-            }
-            paginationContainer.appendChild(prevBtn);
+            prevBtn.innerHTML = '&laquo; 前一批';
+            prevBtn.title = '查看前一批资讯';
             
-            // 确定要显示的页码范围
-            let startPage = Math.max(1, currentPage - 2);
-            let endPage = Math.min(totalPages, startPage + 4);
-            
-            // 调整起始页以确保显示5个页码按钮（如果有这么多页）
-            if (endPage - startPage < 4 && totalPages > 5) {
-                startPage = Math.max(1, endPage - 4);
-            }
-            
-            // 添加第一页按钮（如果不在显示范围内）
-            if (startPage > 1) {
-                const firstBtn = document.createElement('button');
-                firstBtn.textContent = '1';
-                firstBtn.addEventListener('click', () => goToPage(1));
-                paginationContainer.appendChild(firstBtn);
-                
-                // 添加省略号（如果需要）
-                if (startPage > 2) {
-                    const ellipsis = document.createElement('button');
-                    ellipsis.textContent = '...';
-                    ellipsis.classList.add('disabled');
-                    paginationContainer.appendChild(ellipsis);
-                }
-            }
-            
-            // 添加页码按钮
-            for (let i = startPage; i <= endPage; i++) {
-                const pageBtn = document.createElement('button');
-                pageBtn.textContent = i.toString();
-                if (i === currentPage) {
-                    pageBtn.classList.add('active');
-                } else {
-                    pageBtn.addEventListener('click', () => goToPage(i));
-                }
-                paginationContainer.appendChild(pageBtn);
-            }
-            
-            // 添加省略号和最后一页按钮（如果需要）
-            if (endPage < totalPages) {
-                // 添加省略号（如果需要）
-                if (endPage < totalPages - 1) {
-                    const ellipsis = document.createElement('button');
-                    ellipsis.textContent = '...';
-                    ellipsis.classList.add('disabled');
-                    paginationContainer.appendChild(ellipsis);
-                }
-                
-                const lastBtn = document.createElement('button');
-                lastBtn.textContent = totalPages.toString();
-                lastBtn.addEventListener('click', () => goToPage(totalPages));
-                paginationContainer.appendChild(lastBtn);
-            }
-            
-            // 添加下一页按钮
             const nextBtn = document.createElement('button');
-            nextBtn.innerHTML = '&raquo;';
-            nextBtn.title = '下一页';
-            nextBtn.classList.add(currentPage === totalPages ? 'disabled' : 'next-page');
-            if (currentPage !== totalPages) {
-                nextBtn.addEventListener('click', () => goToPage(currentPage + 1));
-            }
+            nextBtn.innerHTML = '后一批 &raquo;';
+            nextBtn.title = '查看下一批资讯';
+            
+            prevBtn.classList.add('disabled'); // 默认禁用前一批
+            nextBtn.classList.add('disabled'); // 默认禁用后一批
+            
+            paginationContainer.appendChild(prevBtn);
             paginationContainer.appendChild(nextBtn);
         }
-        
-        // 确保分页控件始终显示
-        paginationContainer.style.display = 'flex';
     }
     
     // 跳转到指定页
@@ -1151,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // 创建卡片包装器，移除点击跳转逻辑
+            // 创建卡片包装器
             const cardWrapper = document.createElement('div');
             cardWrapper.className = 'news-card';
             
@@ -1165,9 +1026,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const cardFooter = document.createElement('div');
             cardFooter.className = 'news-card-footer';
             
-            // 调试输出
-            console.log('卡片来源:', news.source, '标题:', news.title);
-            
             // 根据来源填充内容
             if (news.source === 'Twitter' || news.source === 'X' || news.source === 'x.com') {
                 // X/Twitter卡片内容
@@ -1180,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 标题部分
                 cardHeader.innerHTML = `<h2 class="news-title">${title}</h2>`;
                 
-                // 内容部分
+                // 内容部分 - 修改为使用新的渐变蒙版样式
                 if (isLongContent) {
                     cardContent.innerHTML = `
                         <div class="news-content">
@@ -1199,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                 }
                 
-                // 底部信息部分 - 移除重复日期、添加按钮、调整社交信息显示
+                // 底部信息部分
                 cardFooter.innerHTML = `
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">${escapeHTML(news.author)} ${timeDisplay ? `· ${timeDisplay}` : ''}</div>` : ''}
@@ -1225,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 标题部分
                 cardHeader.innerHTML = `<h2 class="news-title">${title}</h2>`;
                 
-                // 内容部分
+                // 内容部分 - 修改为使用新的渐变蒙版样式
                 if (isLongContent) {
                     cardContent.innerHTML = `
                         <div class="news-content">
@@ -1244,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                 }
                 
-                // 底部信息部分 - 移除重复日期、添加按钮
+                // 底部信息部分
                 cardFooter.innerHTML = `
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
@@ -1275,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 `;
                 
-                // 底部信息部分 - 移除重复日期、添加按钮
+                // 底部信息部分
                 cardFooter.innerHTML = `
                     <div class="news-meta">
                         ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
