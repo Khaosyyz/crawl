@@ -663,6 +663,15 @@ footer {
     margin-bottom: 30px;
 }
 
+/* 特别为Crunchbase样式设置 */
+.extra-news-container.crunchbase-style {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
 @media (max-width: 768px) {
     .extra-news-container {
         grid-template-columns: 1fr;

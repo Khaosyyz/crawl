@@ -166,8 +166,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // 显示加载状态
         newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
         
-        // 构建API URL，添加date_page参数
-        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}`;
+        // 构建API URL，添加date_page参数和缓存破坏参数
+        const timestamp = new Date().getTime();
+        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_=${timestamp}`;
         
         // 执行第一个请求
         fetchAllPages(apiUrl);
@@ -368,7 +369,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!crunchbaseNews || crunchbaseNews.length === 0) {
             isLoading = true;
             newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
-            const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}`;
+            const timestamp = new Date().getTime();
+            const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_=${timestamp}`;
             fetch(`${apiUrl}`, {
                 method: 'GET',
                 mode: 'cors',
@@ -416,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let allDates = Object.keys(dateGroups).sort().reverse();
         
         // 总日期页数
-        const totalDatePages = Math.ceil(allDates.length / 3);
+        const totalDatePages = Math.ceil(allDates.length / 2); // 每页显示2天
         
         // 确保当前日期页在有效范围内
         if (currentDatePage < 1) currentDatePage = 1;
@@ -465,9 +467,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         newsContainer.appendChild(dateNavContainer);
         
-        // 计算当前日期页应显示的日期
-        const startIdx = (currentDatePage - 1) * 3;
-        const endIdx = Math.min(startIdx + 3, allDates.length);
+        // 计算当前日期页应显示的日期，每页显示2天
+        const startIdx = (currentDatePage - 1) * 2;
+        const endIdx = Math.min(startIdx + 2, allDates.length);
         const currentDates = allDates.slice(startIdx, endIdx);
         
         // 遍历当前页的每个日期组
@@ -481,6 +483,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 创建当前日期的新闻组容器
             const dateNewsContainer = document.createElement('div');
             dateNewsContainer.className = 'news-group crunchbase-style';
+            dateNewsContainer.dataset.date = dateStr;
             
             // 获取该日期的新闻 (每个日期最多展示3条)
             const dateNews = dateGroups[dateStr].slice(0, 3);
@@ -493,36 +496,62 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 如果该日期有超过3条新闻，添加"查看更多"按钮
             if (dateGroups[dateStr].length > 3) {
-                const moreBtn = document.createElement('div');
-                moreBtn.className = 'expand-button';
-                const moreLink = document.createElement('button');
-                moreLink.textContent = `查看更多 (${dateGroups[dateStr].length - 3}条)`;
+                // 创建按钮容器
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'news-buttons-container';
+                buttonContainer.dataset.date = dateStr;
                 
-                // 创建隐藏容器，存放剩余新闻
-                const hiddenContainer = document.createElement('div');
-                hiddenContainer.className = 'hidden-news crunchbase-style';
-                hiddenContainer.style.display = 'none';
+                const loadMoreButton = document.createElement('button');
+                loadMoreButton.className = 'load-more-button';
+                loadMoreButton.textContent = `显示更多 (${dateGroups[dateStr].length - 3}条)`;
+                loadMoreButton.dataset.date = dateStr;
+                
+                // 创建收起按钮但初始不显示
+                const collapseButton = document.createElement('button');
+                collapseButton.className = 'collapse-button';
+                collapseButton.textContent = '收起';
+                collapseButton.dataset.date = dateStr;
+                collapseButton.style.display = 'none'; // 初始隐藏
+                
+                // 额外的新闻卡片容器 (用于存放剩余新闻)
+                const extraNewsContainer = document.createElement('div');
+                extraNewsContainer.className = 'extra-news-container crunchbase-style';
+                extraNewsContainer.style.display = 'none'; // 初始隐藏
+                extraNewsContainer.dataset.date = dateStr;
                 
                 // 添加剩余新闻
                 dateGroups[dateStr].slice(3).forEach(news => {
                     const newsCard = createNewsCard(news);
-                    hiddenContainer.appendChild(newsCard);
+                    extraNewsContainer.appendChild(newsCard);
                 });
                 
-                // 展开/收起切换逻辑
-                moreLink.addEventListener('click', function() {
-                    if (hiddenContainer.style.display === 'none') {
-                        hiddenContainer.style.display = 'flex';
-                        this.textContent = '收起';
-                    } else {
-                        hiddenContainer.style.display = 'none';
-                        this.textContent = `查看更多 (${dateGroups[dateStr].length - 3}条)`;
-                    }
-                });
+                // 点击显示更多按钮时的逻辑
+                loadMoreButton.onclick = () => {
+                    // 显示额外的新闻
+                    extraNewsContainer.style.display = 'flex';
+                    // 隐藏显示更多按钮
+                    loadMoreButton.style.display = 'none';
+                    // 显示收起按钮
+                    collapseButton.style.display = 'block';
+                };
                 
-                moreBtn.appendChild(moreLink);
-                newsContainer.appendChild(moreBtn);
-                newsContainer.appendChild(hiddenContainer);
+                // 点击收起按钮时的逻辑
+                collapseButton.onclick = () => {
+                    // 隐藏额外的新闻
+                    extraNewsContainer.style.display = 'none';
+                    // 显示显示更多按钮
+                    loadMoreButton.style.display = 'block';
+                    // 隐藏收起按钮
+                    collapseButton.style.display = 'none';
+                };
+                
+                // 添加按钮到按钮容器
+                buttonContainer.appendChild(loadMoreButton);
+                buttonContainer.appendChild(collapseButton);
+                
+                // 将按钮容器和额外新闻容器添加到DOM
+                newsContainer.appendChild(buttonContainer);
+                newsContainer.appendChild(extraNewsContainer);
             }
         });
 
