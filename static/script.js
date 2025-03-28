@@ -496,52 +496,106 @@ document.addEventListener('DOMContentLoaded', function() {
             // 清空现有分页
             paginationContainer.innerHTML = '';
             
-            // 只有在有多个日期页时才显示分页
-            if (totalDatePages > 1) {
-                // 前一页按钮
-                if (currentDatePage > 1) {
-                    const prevBtn = document.createElement('button');
-                    prevBtn.innerHTML = '&laquo;';
-                    prevBtn.addEventListener('click', () => {
-                        currentDatePage--;
-                        displayCrunchbaseNews();
-                        window.scrollTo(0, 0);
-                    });
-                    paginationContainer.appendChild(prevBtn);
-                }
-                
-                // 添加页码按钮
-                for (let i = 1; i <= totalDatePages; i++) {
-                    const pageBtn = document.createElement('button');
-                    pageBtn.textContent = i.toString();
-                    if (i === currentDatePage) {
-                        pageBtn.classList.add('active');
-                    } else {
-                        pageBtn.addEventListener('click', () => {
-                            currentDatePage = i;
-                            displayCrunchbaseNews();
-                            window.scrollTo(0, 0);
-                        });
-                    }
-                    paginationContainer.appendChild(pageBtn);
-                }
-                
-                // 后一页按钮
-                if (currentDatePage < totalDatePages) {
-                    const nextBtn = document.createElement('button');
-                    nextBtn.innerHTML = '&raquo;';
-                    nextBtn.addEventListener('click', () => {
-                        currentDatePage++;
-                        displayCrunchbaseNews();
-                        window.scrollTo(0, 0);
-                    });
-                    paginationContainer.appendChild(nextBtn);
-                }
-                
-                paginationContainer.style.display = 'flex';
+            // 总是显示分页，即使当前只有一页
+            // 前一页按钮
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = '&laquo;';
+            prevBtn.title = '上一页';
+            
+            if (currentDatePage > 1) {
+                prevBtn.addEventListener('click', () => {
+                    currentDatePage--;
+                    displayCrunchbaseNews();
+                    window.scrollTo(0, 0);
+                });
             } else {
-                paginationContainer.style.display = 'none';
+                prevBtn.classList.add('disabled');
             }
+            paginationContainer.appendChild(prevBtn);
+            
+            // 确定要显示的页码范围
+            let startPage = Math.max(1, currentDatePage - 2);
+            let endPage = Math.min(totalDatePages, startPage + 4);
+            
+            // 调整起始页以确保显示5个页码按钮（如果有这么多页）
+            if (endPage - startPage < 4 && totalDatePages > 5) {
+                startPage = Math.max(1, endPage - 4);
+            }
+            
+            // 添加第一页按钮（如果不在显示范围内）
+            if (startPage > 1) {
+                const firstBtn = document.createElement('button');
+                firstBtn.textContent = '1';
+                firstBtn.addEventListener('click', () => {
+                    currentDatePage = 1;
+                    displayCrunchbaseNews();
+                    window.scrollTo(0, 0);
+                });
+                paginationContainer.appendChild(firstBtn);
+                
+                // 添加省略号（如果需要）
+                if (startPage > 2) {
+                    const ellipsis = document.createElement('button');
+                    ellipsis.textContent = '...';
+                    ellipsis.classList.add('disabled');
+                    paginationContainer.appendChild(ellipsis);
+                }
+            }
+            
+            // 添加页码按钮
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i.toString();
+                if (i === currentDatePage) {
+                    pageBtn.classList.add('active');
+                } else {
+                    pageBtn.addEventListener('click', () => {
+                        currentDatePage = i;
+                        displayCrunchbaseNews();
+                        window.scrollTo(0, 0);
+                    });
+                }
+                paginationContainer.appendChild(pageBtn);
+            }
+            
+            // 添加省略号和最后一页按钮（如果需要）
+            if (endPage < totalDatePages) {
+                // 添加省略号（如果需要）
+                if (endPage < totalDatePages - 1) {
+                    const ellipsis = document.createElement('button');
+                    ellipsis.textContent = '...';
+                    ellipsis.classList.add('disabled');
+                    paginationContainer.appendChild(ellipsis);
+                }
+                
+                const lastBtn = document.createElement('button');
+                lastBtn.textContent = totalDatePages.toString();
+                lastBtn.addEventListener('click', () => {
+                    currentDatePage = totalDatePages;
+                    displayCrunchbaseNews();
+                    window.scrollTo(0, 0);
+                });
+                paginationContainer.appendChild(lastBtn);
+            }
+            
+            // 后一页按钮
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = '&raquo;';
+            nextBtn.title = '下一页';
+            
+            if (currentDatePage < totalDatePages) {
+                nextBtn.addEventListener('click', () => {
+                    currentDatePage++;
+                    displayCrunchbaseNews();
+                    window.scrollTo(0, 0);
+                });
+            } else {
+                nextBtn.classList.add('disabled');
+            }
+            paginationContainer.appendChild(nextBtn);
+            
+            // 确保分页控件始终显示
+            paginationContainer.style.display = 'flex';
         }
     }
 
