@@ -76,20 +76,41 @@ main {
 
 .news-card {
     background-color: #fff;
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.3s, box-shadow 0.3s;
     display: flex;
     flex-direction: column;
-    margin-bottom: 20px;
+    height: 100%;
     width: 100%;
     box-sizing: border-box;
+    position: relative;
+    border: 1px solid #eef1f5;
+    cursor: pointer;
 }
 
 .news-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transform: translateY(-6px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+}
+
+.news-card:hover::after {
+    content: "点击阅读原文";
+    position: absolute;
+    right: 15px;
+    bottom: 15px;
+    background-color: #1d9bf0;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    opacity: 0.9;
+    transition: opacity 0.2s;
+}
+
+.news-card:hover::after:hover {
+    opacity: 1;
 }
 
 .news-header {
@@ -659,11 +680,30 @@ footer {
     box-sizing: border-box;
     position: relative;
     border: 1px solid #eef1f5;
+    cursor: pointer;
 }
 
 .news-card:hover {
     transform: translateY(-6px);
     box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+}
+
+.news-card:hover::after {
+    content: "点击阅读原文";
+    position: absolute;
+    right: 15px;
+    bottom: 15px;
+    background-color: #1d9bf0;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    opacity: 0.9;
+    transition: opacity 0.2s;
+}
+
+.news-card:hover::after:hover {
+    opacity: 1;
 }
 
 /* 标题样式 */
@@ -836,4 +876,64 @@ footer {
     top: 10px;
     z-index: 10;
     width: 100%;
+}
+
+/* 统一卡片布局结构为三部分 */
+.news-card-header {
+    padding: 20px 20px 10px 20px;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+.news-card-content {
+    padding: 15px 20px;
+    flex: 1;
+}
+
+.news-card-footer {
+    padding: 10px 20px 20px 20px;
+    border-top: 1px solid #f0f2f5;
+    background-color: #fafbfc;
+}
+
+/* 刷新提示样式 */
+.refresh-message {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    transition: opacity 0.5s;
+    text-align: center;
+}
+
+/* 警告条样式 */
+.warning-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 10px;
+    text-align: center;
+    z-index: 1000;
+    border-bottom: 1px solid #ffeeba;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: opacity 0.5s;
+}
+
+/* 加载消息样式 */
+.loading-message {
+    text-align: center;
+    padding: 20px;
+    margin: 20px auto;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    color: #6c757d;
+    max-width: 500px;
 }

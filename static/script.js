@@ -104,10 +104,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 刷新按钮点击事件
+    // 刷新按钮点击事件 - 强制忽略缓存
     if (refreshButton) {
         refreshButton.addEventListener('click', function() {
-            forceRefreshData(); // 使用新的强制刷新函数
+            // 清除相关缓存
+            const cacheKeysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('news-data-' + currentSource)) {
+                    cacheKeysToRemove.push(key);
+                }
+            }
+            
+            // 删除缓存
+            cacheKeysToRemove.forEach(key => localStorage.removeItem(key));
+            
+            // 强制刷新
+            forceRefreshData();
+            
+            // 显示刷新提示
+            const refreshMsg = document.createElement('div');
+            refreshMsg.className = 'refresh-message';
+            refreshMsg.textContent = '数据已刷新！';
+            document.body.appendChild(refreshMsg);
+            
+            // 2秒后自动消失
+            setTimeout(() => {
+                refreshMsg.style.opacity = '0';
+                setTimeout(() => refreshMsg.remove(), 500);
+            }, 2000);
         });
     }
 
@@ -211,91 +236,132 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 获取新闻数据
     function fetchData() {
-        // 如果正在加载中则不重复请求
-        if (isLoading) return;
-        
-        isLoading = true;
-        lastError = null;
-        
-        // 获取不同新闻源的容器
-        const xNewsContainer = document.getElementById('x-news-container');
-        const crunchbaseNewsContainer = document.getElementById('crunchbase-news-container');
-        
-        // 显示当前活跃标签的加载状态
-        const activeTab = document.querySelector('.tab-content.active');
-        const activeContainer = activeTab.querySelector('.news-container');
-        showLoading(activeContainer);
-        
-        // 调用适当的获取函数
-        const params = new URLSearchParams(window.location.search);
-        const activeTabId = activeTab.id;
-        
-        if (activeTabId === 'x-tab-content') {
-            fetchCurrentPage('X', xNewsContainer, params.get('page') || 1);
-        } else if (activeTabId === 'crunchbase-tab-content') {
-            fetchCurrentPage('Crunchbase', crunchbaseNewsContainer, null, params.get('date_page') || currentDatePage || 1);
-        }
-    }
-
-    // 获取当前页数据
-    function fetchCurrentPage(source, container, page = 1, datePage = 1) {
-        // 构建URL，添加时间戳防止缓存
-        let apiUrl = `/api/articles?source=${source}&cache_buster=${Date.now()}`;
-        
-        // 根据来源添加适当的参数
-        if (source === 'X') {
-            apiUrl += `&page=${page}`;
-        } else if (source === 'Crunchbase') {
-            apiUrl += `&date_page=${datePage}`;
-            currentDatePage = parseInt(datePage);
-        }
-        
-        // 设置超时
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('请求超时，请检查网络连接')), 30000)
-        );
-        
-        // 发起请求并处理超时
-        Promise.race([
-            fetch(apiUrl, {
-                method: 'GET',
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
+        try {
+            // 设置加载状态
+            isLoading = true;
+            // 显示加载指示器
+            showLoading(newsContainer);
+            
+            // 清空当前新闻
+            newsContainer.innerHTML = '';
+            
+            // 创建一个唯一的、缓存无关的时间戳
+            const timestamp = Date.now();
+            
+            // 检查缓存
+            const cacheKey = `news-data-${currentSource}-${currentPage}-${currentDatePage}`;
+            const cachedData = localStorage.getItem(cacheKey);
+            const cacheTimestampKey = `${cacheKey}-timestamp`;
+            const cacheTimestamp = localStorage.getItem(cacheTimestampKey);
+            const cacheValidityMinutes = 10; // 缓存有效期10分钟
+            
+            // 如果有缓存，并且缓存未过期，使用缓存数据
+            if (cachedData && cacheTimestamp) {
+                const cacheAge = (Date.now() - parseInt(cacheTimestamp)) / (1000 * 60);
+                if (cacheAge < cacheValidityMinutes) {
+                    console.log(`使用缓存数据，缓存年龄: ${cacheAge.toFixed(2)}分钟`);
+                    allNewsData = JSON.parse(cachedData);
+                    isLoading = false;
+                    hideLoading();
+                    processAndDisplayData();
+                    return;
+                } else {
+                    console.log(`缓存已过期，缓存年龄: ${cacheAge.toFixed(2)}分钟`);
                 }
-            }),
-            timeoutPromise
-        ])
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
             }
-            return response.json();
-        })
-        .then(data => {
-            // 处理数据
-            if (data && data.status === 'success') {
-                // 根据来源显示数据
-                if (source === 'X') {
-                    displayXNews(data);
-                } else if (source === 'Crunchbase') {
-                    displayCrunchbaseNews(data);
-                }
-                hideLoading();
-            } else {
-                throw new Error('API返回格式错误或无数据');
-            }
-        })
-        .catch(error => {
-            console.error('获取数据失败:', error);
-            lastError = error.message || '获取数据失败，请重试';
-            hideLoading();
-            showError(container, lastError);
-        })
-        .finally(() => {
+            
+            // 加载中的提示
+            const loadingMessage = document.createElement('div');
+            loadingMessage.className = 'loading-message';
+            loadingMessage.innerHTML = `<p>正在从服务器获取最新数据...</p>`;
+            newsContainer.appendChild(loadingMessage);
+            
+            // 构建API URL
+            // 如果是Crunchbase，添加日期页参数
+            const apiUrl = currentSource === 'crunchbase.com' 
+                ? `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_=${timestamp}`
+                : `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&_=${timestamp}`;
+                
+            console.log(`获取数据: ${apiUrl}`);
+            
+            // 发送请求
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`获取数据失败，HTTP状态码 ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("数据获取成功:", data);
+                    
+                    // 存储数据到缓存
+                    localStorage.setItem(cacheKey, JSON.stringify(data));
+                    localStorage.setItem(cacheTimestampKey, Date.now().toString());
+                    
+                    // 更新全局数据
+                    allNewsData = data;
+                    
+                    // 如果是Crunchbase类型的数据，可能有特定的处理逻辑
+                    if (currentSource === 'crunchbase.com') {
+                        // 设置总页数
+                        if (data.total_pages) {
+                            totalPages = data.total_pages;
+                        }
+                    }
+                    
+                    // 处理和显示数据
+                    processAndDisplayData();
+                })
+                .catch(error => {
+                    // 如果API请求失败，但有缓存数据，使用缓存数据
+                    if (cachedData) {
+                        console.log("API请求失败，使用可能过期的缓存数据");
+                        allNewsData = JSON.parse(cachedData);
+                        processAndDisplayData();
+                        
+                        // 显示轻微的错误提示
+                        const warningBar = document.createElement('div');
+                        warningBar.className = 'warning-bar';
+                        warningBar.innerHTML = `
+                            <p>注意：无法获取最新数据，显示的是缓存数据。错误信息: ${error.message}</p>
+                        `;
+                        document.body.insertBefore(warningBar, document.body.firstChild);
+                        
+                        // 3秒后自动消失
+                        setTimeout(() => {
+                            warningBar.style.opacity = '0';
+                            setTimeout(() => warningBar.remove(), 500);
+                        }, 3000);
+                    } else {
+                        // 如果没有缓存数据，显示错误
+                        console.error("获取数据错误:", error);
+                        showError(newsContainer, `获取数据失败: ${error.message}`);
+                        lastError = error;
+                    }
+                })
+                .finally(() => {
+                    // 完成加载
+                    isLoading = false;
+                    hideLoading();
+                    
+                    // 移除加载消息
+                    const loadingMessage = document.querySelector('.loading-message');
+                    if (loadingMessage) {
+                        loadingMessage.remove();
+                    }
+                    
+                    // 重新启用刷新按钮
+                    if (refreshButton) {
+                        refreshButton.disabled = false;
+                        refreshButton.classList.remove('disabled');
+                    }
+                });
+        } catch (error) {
+            console.error("fetchData异常:", error);
+            showError(newsContainer, `获取数据时发生异常: ${error.message}`);
             isLoading = false;
-        });
+        }
     }
 
     // 执行搜索
@@ -1000,70 +1066,148 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            let html = '';
+            // 创建可点击的卡片包装器
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = 'news-card';
             
+            // 如果有原文链接，添加点击事件
+            if (news.url) {
+                cardWrapper.onclick = function() {
+                    window.open(news.url, '_blank');
+                };
+            }
+            
+            // 创建统一的三段式卡片结构
+            const cardHeader = document.createElement('div');
+            cardHeader.className = 'news-card-header';
+            
+            const cardContent = document.createElement('div');
+            cardContent.className = 'news-card-content';
+            
+            const cardFooter = document.createElement('div');
+            cardFooter.className = 'news-card-footer';
+            
+            // 根据来源填充内容
             if (news.source === 'Twitter' || news.source === 'X') {
-                // X/Twitter卡片样式
-                // ... existing code ...
+                // X/Twitter卡片内容
+                const title = escapeHTML(news.title) || '无标题';
+                const content = formatContent(escapeHTML(news.content) || '无内容');
+                
+                // 收起超过200字符的内容
+                const isLongContent = content.length > 200;
+                
+                // 标题部分
+                cardHeader.innerHTML = `<h2 class="news-title">${title}</h2>`;
+                
+                // 内容部分
+                if (isLongContent) {
+                    cardContent.innerHTML = `
+                        <div class="news-content">
+                            <p class="content-text collapsed">${content.substring(0, 200)}...</p>
+                            <div class="full-content" style="display: none;">
+                                <p>${content}</p>
+                            </div>
+                            <button class="toggle-content-btn">显示全部</button>
+                        </div>
+                    `;
+                } else {
+                    cardContent.innerHTML = `
+                        <div class="news-content">
+                            <p class="content-text">${content}</p>
+                        </div>
+                    `;
+                }
+                
+                // 底部信息部分
+                cardFooter.innerHTML = `
+                    <div class="news-meta">
+                        ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
+                        <div class="news-date">${dateDisplay}</div>
+                    </div>
+                    ${news.likes || news.retweets || news.followers ? `
+                    <div class="news-social-stats">
+                        ${news.likes ? `<span>喜欢: ${formatNumber(news.likes)}</span>` : ''}
+                        ${news.retweets ? `<span>转发: ${formatNumber(news.retweets)}</span>` : ''}
+                        ${news.followers ? `<span>粉丝: ${formatNumber(news.followers)}</span>` : ''}
+                    </div>` : ''}
+                `;
             } else if (news.source === 'Crunchbase') {
-                // Crunchbase卡片样式
+                // Crunchbase卡片内容
                 const title = escapeHTML(news.title) || '无标题';
                 const content = escapeHTML(news.content) || '无内容';
                 
                 // 收起超过200字符的内容
                 const isLongContent = content.length > 200;
-                const displayContent = isLongContent ? content.substring(0, 200) + '...' : content;
                 
-                html = `
-                <div class="crunchbase-news">
-                    <div class="news-title">
-                        <h2>${title}</h2>
+                // 标题部分
+                cardHeader.innerHTML = `<h2 class="news-title">${title}</h2>`;
+                
+                // 内容部分
+                if (isLongContent) {
+                    cardContent.innerHTML = `
+                        <div class="news-content">
+                            <p class="content-text collapsed">${content.substring(0, 200)}...</p>
+                            <div class="full-content" style="display: none;">
+                                <p>${content}</p>
+                            </div>
+                            <button class="toggle-content-btn">显示全部</button>
+                        </div>
+                    `;
+                } else {
+                    cardContent.innerHTML = `
+                        <div class="news-content">
+                            <p class="content-text">${content}</p>
+                        </div>
+                    `;
+                }
+                
+                // 底部信息部分
+                cardFooter.innerHTML = `
+                    <div class="news-meta">
+                        ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
+                        <div class="news-date">${dateDisplay}</div>
                     </div>
-                    
-                    <div class="news-content">
-                        <p class="content-text${isLongContent ? ' collapsed' : ''}">${displayContent}</p>
-                        ${isLongContent ? `
-                        <div class="full-content" style="display: none;">
-                            <p>${content}</p>
-                        </div>
-                        <button class="toggle-content-btn">显示全部</button>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="news-footer">
-                        <div class="news-metadata">
-                            <span class="news-source">${news.source}</span>
-                            <span class="news-date">${dateDisplay}</span>
-                            ${news.url ? `<a href="${news.url}" target="_blank" class="news-link">原文链接</a>` : ''}
-                        </div>
-                        
-                        ${news.author ? `
-                        <div class="author-info">
-                            <span class="author-label">作者:</span>
-                            <span class="author-name">${escapeHTML(news.author)}</span>
-                        </div>
-                        ` : ''}
-                        
-                        ${news.company || news.funding_round || news.funding_amount || news.investors ? `
-                        <div class="investment-info">
-                            ${news.company ? `<div class="company"><span>公司:</span> ${escapeHTML(news.company)}</div>` : ''}
-                            ${news.funding_round ? `<div class="round"><span>轮次:</span> ${escapeHTML(news.funding_round)}</div>` : ''}
-                            ${news.funding_amount ? `<div class="amount"><span>金额:</span> ${escapeHTML(news.funding_amount)}</div>` : ''}
-                            ${news.investors ? `<div class="investors"><span>投资方:</span> ${escapeHTML(news.investors)}</div>` : ''}
-                        </div>
-                        ` : ''}
-                    </div>
-                </div>
+                    ${news.company || news.funding_round || news.funding_amount || news.investors ? `
+                    <div class="news-investment-info">
+                        ${news.company ? `<div class="investment-row"><span class="info-label">公司:</span> <span class="info-value">${escapeHTML(news.company)}</span></div>` : ''}
+                        ${news.funding_round ? `<div class="investment-row"><span class="info-label">轮次:</span> <span class="info-value">${escapeHTML(news.funding_round)}</span></div>` : ''}
+                        ${news.funding_amount ? `<div class="investment-row"><span class="info-label">金额:</span> <span class="info-value">${escapeHTML(news.funding_amount)}</span></div>` : ''}
+                        ${news.investors ? `<div class="investment-row"><span class="info-label">投资方:</span> <span class="info-value">${escapeHTML(news.investors)}</span></div>` : ''}
+                    </div>` : ''}
                 `;
             } else {
                 // 默认卡片样式
-                // ... existing code ...
+                const title = escapeHTML(news.title) || '无标题';
+                const content = formatContent(escapeHTML(news.content) || '无内容');
+                
+                // 标题部分
+                cardHeader.innerHTML = `<h2 class="news-title">${title}</h2>`;
+                
+                // 内容部分
+                cardContent.innerHTML = `
+                    <div class="news-content">
+                        <p>${content}</p>
+                    </div>
+                `;
+                
+                // 底部信息部分
+                cardFooter.innerHTML = `
+                    <div class="news-meta">
+                        ${news.author ? `<div class="news-author">作者: ${escapeHTML(news.author)}</div>` : ''}
+                        <div class="news-date">${dateDisplay}</div>
+                    </div>
+                `;
             }
             
-            return html;
+            // 组装卡片
+            cardWrapper.appendChild(cardHeader);
+            cardWrapper.appendChild(cardContent);
+            cardWrapper.appendChild(cardFooter);
+            
+            return cardWrapper;
         } catch (error) {
             console.error("Error creating news card:", error);
-            return '';
+            return document.createElement('div');
         }
     }
 
@@ -1161,10 +1305,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始检查
     checkScrollPosition();
 
-    // 添加事件委托来处理"显示全部"按钮点击
+    // 事件委托处理
     document.addEventListener('click', function(event) {
-        // 检查点击的是否是toggle-content-btn按钮
-        if (event.target && event.target.classList.contains('toggle-content-btn')) {
+        // 阻止卡片内部元素（如按钮）点击事件触发卡片的点击事件
+        if (event.target.className === 'toggle-content-btn') {
+            event.stopPropagation();
+            
+            // 处理内容展开/收起逻辑
             const contentContainer = event.target.closest('.news-content');
             const collapsedText = contentContainer.querySelector('.content-text');
             const fullContent = contentContainer.querySelector('.full-content');
