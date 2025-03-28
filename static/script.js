@@ -260,10 +260,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const cacheAge = (Date.now() - parseInt(cacheTimestamp)) / (1000 * 60);
                 if (cacheAge < cacheValidityMinutes) {
                     console.log(`使用缓存数据，缓存年龄: ${cacheAge.toFixed(2)}分钟`);
-                    allNewsData = JSON.parse(cachedData);
+                    const parsedData = JSON.parse(cachedData);
+                    allNewsData = parsedData.data || parsedData;
                     isLoading = false;
                     hideLoading();
-                    processAndDisplayNews(allNewsData);
+                    processAndDisplayNews(Array.isArray(allNewsData) ? allNewsData : []);
                     return;
                 } else {
                     console.log(`缓存已过期，缓存年龄: ${cacheAge.toFixed(2)}分钟`);
@@ -300,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     localStorage.setItem(cacheTimestampKey, Date.now().toString());
                     
                     // 更新全局数据
-                    allNewsData = data;
+                    allNewsData = data.data || [];
                     
                     // 如果是Crunchbase类型的数据，可能有特定的处理逻辑
                     if (currentSource === 'crunchbase.com') {
@@ -311,14 +312,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // 处理和显示数据
-                    processAndDisplayNews(data.data);
+                    processAndDisplayNews(allNewsData);
                 })
                 .catch(error => {
                     // 如果API请求失败，但有缓存数据，使用缓存数据
                     if (cachedData) {
                         console.log("API请求失败，使用可能过期的缓存数据");
-                        allNewsData = JSON.parse(cachedData);
-                        processAndDisplayNews(allNewsData);
+                        const parsedData = JSON.parse(cachedData);
+                        allNewsData = parsedData.data || parsedData;
+                        processAndDisplayNews(Array.isArray(allNewsData) ? allNewsData : []);
                         
                         // 显示轻微的错误提示
                         const warningBar = document.createElement('div');
@@ -917,6 +919,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // 按日期分组新闻
     function groupNewsByDate(newsData) {
         const grouped = {};
+        
+        // 确保newsData是数组
+        if (!Array.isArray(newsData)) {
+            console.error("groupNewsByDate: newsData不是数组", newsData);
+            return grouped;
+        }
         
         newsData.forEach(news => {
             // 从日期时间字段中提取日期部分
