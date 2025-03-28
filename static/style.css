@@ -782,8 +782,28 @@ footer {
     display: flex;
     flex-direction: column;
     border: 1px solid #e1e8ed;
-    width: 100%;
+    width: 100% !important;
+    box-sizing: border-box;
     transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.crunchbase-style {
+    display: flex;
+    flex-direction: column;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.hidden-news {
+    display: flex;
+    flex-direction: column;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.hidden-news.crunchbase-style {
+    width: 100% !important;
+    box-sizing: border-box;
 }
 
 .crunchbase-news:hover {

@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
         
         // 构建API URL，添加date_page参数
-        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentPage}`;
+        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}`;
         
         // 执行第一个请求
         fetchAllPages(apiUrl);
@@ -364,9 +364,38 @@ document.addEventListener('DOMContentLoaded', function() {
         // 清空现有内容
         newsContainer.innerHTML = '';
 
-        // 如果没有数据
+        // 如果没有数据，重新获取当前页的数据
         if (!crunchbaseNews || crunchbaseNews.length === 0) {
-            showError('暂无 Crunchbase 资讯数据');
+            isLoading = true;
+            newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
+            const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}`;
+            fetch(`${apiUrl}`, {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (result.status === 'error') {
+                    showError(result.message);
+                    return;
+                }
+                crunchbaseNews = result.data;
+                isLoading = false;
+                displayCrunchbaseNews();
+            })
+            .catch(error => {
+                isLoading = false;
+                showError(`获取数据失败: ${error.message}`);
+            });
             return;
         }
 
@@ -404,6 +433,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 prevDateBtn.textContent = '前几天';
                 prevDateBtn.addEventListener('click', () => {
                     currentDatePage--;
+                    // 强制重新获取数据
+                    crunchbaseNews = [];
                     displayCrunchbaseNews();
                 });
                 dateNavContainer.appendChild(prevDateBtn);
@@ -422,6 +453,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 nextDateBtn.textContent = '后几天';
                 nextDateBtn.addEventListener('click', () => {
                     currentDatePage++;
+                    // 强制重新获取数据
+                    crunchbaseNews = [];
                     displayCrunchbaseNews();
                 });
                 dateNavContainer.appendChild(nextDateBtn);
@@ -446,6 +479,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // 创建当前日期的新闻组容器
             const dateNewsContainer = document.createElement('div');
             dateNewsContainer.className = 'news-group crunchbase-style';
+            dateNewsContainer.style.width = '100%'; // 确保宽度是100%
+            dateNewsContainer.style.display = 'flex';
+            dateNewsContainer.style.flexDirection = 'column';
             
             // 获取该日期的新闻 (每个日期最多展示3条)
             const dateNews = dateGroups[dateStr].slice(0, 3);
@@ -467,6 +503,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const hiddenContainer = document.createElement('div');
                 hiddenContainer.className = 'hidden-news crunchbase-style';
                 hiddenContainer.style.display = 'none';
+                hiddenContainer.style.width = '100%'; // 确保宽度是100%
+                hiddenContainer.style.flexDirection = 'column';
                 
                 // 添加剩余新闻
                 dateGroups[dateStr].slice(3).forEach(news => {
@@ -505,6 +543,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentDatePage > 1) {
                 prevBtn.addEventListener('click', () => {
                     currentDatePage--;
+                    // 强制重新获取数据
+                    crunchbaseNews = [];
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
@@ -528,6 +568,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 firstBtn.textContent = '1';
                 firstBtn.addEventListener('click', () => {
                     currentDatePage = 1;
+                    // 强制重新获取数据
+                    crunchbaseNews = [];
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
@@ -551,6 +593,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     pageBtn.addEventListener('click', () => {
                         currentDatePage = i;
+                        // 强制重新获取数据
+                        crunchbaseNews = [];
                         displayCrunchbaseNews();
                         window.scrollTo(0, 0);
                     });
@@ -572,6 +616,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 lastBtn.textContent = totalDatePages.toString();
                 lastBtn.addEventListener('click', () => {
                     currentDatePage = totalDatePages;
+                    // 强制重新获取数据
+                    crunchbaseNews = [];
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
@@ -586,6 +632,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentDatePage < totalDatePages) {
                 nextBtn.addEventListener('click', () => {
                     currentDatePage++;
+                    // 强制重新获取数据
+                    crunchbaseNews = [];
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
@@ -972,6 +1020,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (source === 'crunchbase.com') {
                 // 使用三段式结构显示Crunchbase卡片
                 card.classList.add('crunchbase-news');
+                card.style.width = '100%'; // 确保宽度是100%
                 
                 // 构建卡片 HTML
                 let cardHTML = '';
