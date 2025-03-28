@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
         
         // 构建API URL，添加date_page参数
-        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_nocache=${Date.now()}`;
+        const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}`;
         
         // 执行第一个请求
         fetchAllPages(apiUrl);
@@ -180,10 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
             mode: 'cors',
             cache: 'no-cache',
             headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
+                'Content-Type': 'application/json'
             },
         })
         .then(response => {
@@ -371,16 +368,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!crunchbaseNews || crunchbaseNews.length === 0) {
             isLoading = true;
             newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
-            const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_nocache=${Date.now()}`;
+            const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}`;
             fetch(`${apiUrl}`, {
                 method: 'GET',
                 mode: 'cors',
                 cache: 'no-cache',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
+                    'Content-Type': 'application/json'
                 },
             })
             .then(response => {
@@ -394,9 +388,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     showError(result.message);
                     return;
                 }
-                
-                // 调试输出API返回的数据范围
-                console.log(`获取到第${currentDatePage}页数据，日期范围:`, result.date_range);
                 
                 crunchbaseNews = result.data;
                 totalPages = result.total_date_pages || 15; // 确保totalPages被正确设置
@@ -1026,9 +1017,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (source === 'crunchbase.com') {
                 // 使用三段式结构显示Crunchbase卡片
                 card.classList.add('crunchbase-news');
-                
-                // 重要：移除所有可能导致卡片宽度异常的内联样式，依赖CSS样式表
-                // 避免使用内联style，以确保宽度不被覆盖
                 
                 // 构建卡片 HTML
                 let cardHTML = '';
