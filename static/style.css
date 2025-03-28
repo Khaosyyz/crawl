@@ -979,3 +979,46 @@ footer {
     gap: 20px;
     width: 100%;
 }
+
+/* 确保Crunchbase布局样式始终优先级更高 */
+.news-group.crunchbase-style,
+.hidden-news.crunchbase-style,
+.crunchbase-style {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    grid-template-columns: none !important;
+}
+
+/* 强制所有Crunchbase新闻卡片使用统一宽度 */
+.crunchbase-news {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+/* 强制隐藏的新闻容器正确显示 */
+.hidden-news.crunchbase-style[style*="display: flex"] {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+}
+
+/* 确保日期标题宽度一致 */
+.date-header {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* 确保日期导航正确显示 */
+.date-tab-navigation {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin-bottom: 20px !important;
+}
