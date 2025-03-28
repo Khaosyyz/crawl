@@ -1008,8 +1008,12 @@ footer {
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
+    margin: 0 0 20px 0 !important;
+    padding: 20px !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e1e8ed !important;
 }
 
 /* 强制隐藏的新闻容器正确显示 */
@@ -1030,4 +1034,32 @@ footer {
     width: 100% !important;
     box-sizing: border-box !important;
     margin-bottom: 20px !important;
+}
+
+/* 强制Crunchbase新闻容器使用正确布局 */
+.news-group.crunchbase-style, 
+.extra-news-container.crunchbase-style,
+div[class*="crunchbase-style"] {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    grid-template-columns: none !important;
+    gap: 20px !important;
+}
+
+/* 确保新闻内容区域正确显示 */
+.crunchbase-news .news-content {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    white-space: pre-line !important;
+    word-break: break-word !important;
+    line-height: 1.6 !important;
+}
+
+/* 确保展开/收起按钮正确显示 */
+.crunchbase-news .content-toggle {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 0 15px 0 !important;
 }

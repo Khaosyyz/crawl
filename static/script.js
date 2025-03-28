@@ -369,14 +369,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!crunchbaseNews || crunchbaseNews.length === 0) {
             isLoading = true;
             newsContainer.innerHTML = '<div class="loading">正在加载资讯...</div>';
-            const timestamp = new Date().getTime();
+            
+            // 添加唯一时间戳以避免缓存
+            const timestamp = new Date().getTime() + Math.random().toString(36).substring(2, 8);
             const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_=${timestamp}`;
-            fetch(`${apiUrl}`, {
+            
+            console.log(`正在获取数据: date_page=${currentDatePage}, 时间戳=${timestamp}`);
+            
+            // 设置不缓存选项
+            fetch(apiUrl, {
                 method: 'GET',
                 mode: 'cors',
-                cache: 'no-cache',
+                cache: 'no-store', // 强制不使用缓存
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
                 },
             })
             .then(response => {
@@ -391,14 +400,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
+                // 清除旧数据并设置新数据
+                crunchbaseNews = [];
                 crunchbaseNews = result.data;
                 totalPages = result.total_date_pages || 15; // 确保totalPages被正确设置
+                
+                console.log(`获取到数据: ${crunchbaseNews.length}条, 日期范围: ${result.date_range.start} - ${result.date_range.end}`);
+                
                 isLoading = false;
                 displayCrunchbaseNews();
             })
             .catch(error => {
                 isLoading = false;
                 showError(`获取数据失败: ${error.message}`);
+                console.error('API错误:', error);
             });
             return;
         }
@@ -437,8 +452,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 prevDateBtn.textContent = '前几天';
                 prevDateBtn.addEventListener('click', () => {
                     currentDatePage--;
-                    // 强制重新获取数据
-                    crunchbaseNews = [];
+                    // 完全强制重新获取数据
+                    crunchbaseNews = null;
+                    // 清除本地缓存
+                    try {
+                        if (caches && caches.delete) {
+                            caches.delete('news-data-cache').catch(e => console.error('缓存删除失败:', e));
+                        }
+                    } catch (e) {
+                        console.error('缓存操作失败:', e);
+                    }
+                    console.log(`切换到前一页: ${currentDatePage}`);
                     displayCrunchbaseNews();
                 });
                 dateNavContainer.appendChild(prevDateBtn);
@@ -457,8 +481,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 nextDateBtn.textContent = '后几天';
                 nextDateBtn.addEventListener('click', () => {
                     currentDatePage++;
-                    // 强制重新获取数据
-                    crunchbaseNews = [];
+                    // 完全强制重新获取数据
+                    crunchbaseNews = null;
+                    // 清除本地缓存
+                    try {
+                        if (caches && caches.delete) {
+                            caches.delete('news-data-cache').catch(e => console.error('缓存删除失败:', e));
+                        }
+                    } catch (e) {
+                        console.error('缓存操作失败:', e);
+                    }
+                    console.log(`切换到后一页: ${currentDatePage}`);
                     displayCrunchbaseNews();
                 });
                 dateNavContainer.appendChild(nextDateBtn);
@@ -569,8 +602,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentDatePage > 1) {
                 prevBtn.addEventListener('click', () => {
                     currentDatePage--;
-                    // 强制重新获取数据
-                    crunchbaseNews = [];
+                    // 完全强制重新获取数据
+                    crunchbaseNews = null;
+                    // 清除本地缓存
+                    try {
+                        if (caches && caches.delete) {
+                            caches.delete('news-data-cache').catch(e => console.error('缓存删除失败:', e));
+                        }
+                    } catch (e) {
+                        console.error('缓存操作失败:', e);
+                    }
+                    console.log(`切换到上一页: ${currentDatePage}`);
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
@@ -594,8 +636,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 firstBtn.textContent = '1';
                 firstBtn.addEventListener('click', () => {
                     currentDatePage = 1;
-                    // 强制重新获取数据
-                    crunchbaseNews = [];
+                    // 完全强制重新获取数据
+                    crunchbaseNews = null;
+                    // 清除本地缓存
+                    try {
+                        if (caches && caches.delete) {
+                            caches.delete('news-data-cache').catch(e => console.error('缓存删除失败:', e));
+                        }
+                    } catch (e) {
+                        console.error('缓存操作失败:', e);
+                    }
+                    console.log(`跳转到第一页`);
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
@@ -619,8 +670,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     pageBtn.addEventListener('click', () => {
                         currentDatePage = i;
-                        // 强制重新获取数据
-                        crunchbaseNews = [];
+                        // 完全强制重新获取数据
+                        crunchbaseNews = null;
+                        // 清除本地缓存
+                        try {
+                            if (caches && caches.delete) {
+                                caches.delete('news-data-cache').catch(e => console.error('缓存删除失败:', e));
+                            }
+                        } catch (e) {
+                            console.error('缓存操作失败:', e);
+                        }
+                        console.log(`跳转到页码: ${currentDatePage}`);
                         displayCrunchbaseNews();
                         window.scrollTo(0, 0);
                     });
@@ -642,8 +702,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 lastBtn.textContent = totalDatePages.toString();
                 lastBtn.addEventListener('click', () => {
                     currentDatePage = totalDatePages;
-                    // 强制重新获取数据
-                    crunchbaseNews = [];
+                    // 完全强制重新获取数据
+                    crunchbaseNews = null;
+                    // 清除本地缓存
+                    try {
+                        if (caches && caches.delete) {
+                            caches.delete('news-data-cache').catch(e => console.error('缓存删除失败:', e));
+                        }
+                    } catch (e) {
+                        console.error('缓存操作失败:', e);
+                    }
+                    console.log(`跳转到最后一页: ${totalDatePages}`);
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
@@ -658,8 +727,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentDatePage < totalDatePages) {
                 nextBtn.addEventListener('click', () => {
                     currentDatePage++;
-                    // 强制重新获取数据
-                    crunchbaseNews = [];
+                    // 完全强制重新获取数据
+                    crunchbaseNews = null;
+                    // 清除本地缓存
+                    try {
+                        if (caches && caches.delete) {
+                            caches.delete('news-data-cache').catch(e => console.error('缓存删除失败:', e));
+                        }
+                    } catch (e) {
+                        console.error('缓存操作失败:', e);
+                    }
+                    console.log(`切换到下一页: ${currentDatePage}`);
                     displayCrunchbaseNews();
                     window.scrollTo(0, 0);
                 });
