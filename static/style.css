@@ -937,3 +937,31 @@ footer {
     color: #6c757d;
     max-width: 500px;
 }
+
+/* 错误卡片样式 */
+.error-card {
+    background-color: #fff3cd;
+    color: #856404;
+    text-align: center;
+    padding: 30px 20px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 150px;
+}
+
+.error-card .error-message {
+    font-weight: 500;
+}
+
+/* 空数据提示样式 */
+.empty-message {
+    text-align: center;
+    padding: 30px 20px;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    margin: 15px 0;
+}

@@ -88,6 +88,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始加载时执行强制刷新
     forceRefreshData();
 
+    console.log('脚本初始化完成，准备加载数据');
+
     // 添加页面可见性变化监听器，当页面从隐藏变为可见时刷新数据
     document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible') {
@@ -245,6 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 获取新闻数据
     function fetchData() {
         try {
+            console.log('开始获取数据，当前源:', currentSource);
             // 设置加载状态
             isLoading = true;
             // 显示加载指示器
@@ -270,6 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log(`使用缓存数据，缓存年龄: ${cacheAge.toFixed(2)}分钟`);
                     const parsedData = JSON.parse(cachedData);
                     allNewsData = parsedData.data || parsedData;
+                    console.log('从缓存加载的数据:', allNewsData);
                     isLoading = false;
                     hideLoading();
                     processAndDisplayNews(Array.isArray(allNewsData) ? allNewsData : []);
@@ -309,13 +313,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     localStorage.setItem(cacheTimestampKey, Date.now().toString());
                     
                     // 更新全局数据
-                    allNewsData = data.data || [];
+                    if (data && data.data && Array.isArray(data.data)) {
+                        allNewsData = data.data;
+                        console.log('从API获取的文章数:', allNewsData.length);
+                    } else {
+                        console.error('API返回的数据结构异常:', data);
+                        allNewsData = [];
+                    }
                     
                     // 如果是Crunchbase类型的数据，可能有特定的处理逻辑
                     if (currentSource === 'crunchbase.com') {
                         // 设置总页数
-                        if (data.total_pages) {
-                            totalPages = data.total_pages;
+                        if (data.total_date_pages) {
+                            totalPages = data.total_date_pages;
+                            console.log('设置总页数:', totalPages);
                         }
                     }
                     
@@ -499,6 +510,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 如果没有数据，尝试重新获取
             if (currentSource === 'crunchbase.com') {
                 // 强制重新获取Crunchbase数据
+                console.log('没有数据，尝试获取Crunchbase数据');
                 const timestamp = new Date().getTime() + Math.random().toString(36).substring(2, 8);
                 const apiUrl = `https://crawl-beta.vercel.app/api/articles?source=${currentSource}&date_page=${currentDatePage}&_=${timestamp}`;
                 
@@ -528,8 +540,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
                     
+                    console.log('重新获取Crunchbase数据成功:', result);
+                    
                     // 更新数据
-                    allNewsData = result.data;
+                    if (result && result.data && Array.isArray(result.data)) {
+                        allNewsData = result.data;
+                        console.log('获取到数据条数:', allNewsData.length);
+                    } else {
+                        console.error('API响应格式异常:', result);
+                        showError(newsContainer, '获取到的数据格式错误');
+                        return;
+                    }
+                    
                     totalPages = result.total_date_pages || 15;
                     
                     console.log(`获取到数据: ${allNewsData.length}条, 日期范围: ${result.date_range.start} - ${result.date_range.end}`);
@@ -548,9 +570,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        console.log('开始处理显示数据，当前有效数据条数:', allNewsData.length);
+        
         // 按日期分组数据
         groupedNewsByDate = groupNewsByDate(allNewsData);
         dateKeys = Object.keys(groupedNewsByDate).sort().reverse();
+        
+        console.log('数据分组完成，日期组数:', dateKeys.length);
         
         // 检查是否有日期数据
         if (dateKeys.length === 0) {
@@ -604,6 +630,8 @@ document.addEventListener('DOMContentLoaded', function() {
             newsContainer.appendChild(dateNavContainer);
         }
         
+        console.log('开始创建卡片，日期组:', dateKeys);
+        
         // 遍历每个日期组
         dateKeys.forEach(date => {
             // 创建日期分组标题
@@ -615,6 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
             newsContainer.appendChild(dateHeader);
         
             const dateGroup = groupedNewsByDate[date];
+            console.log(`日期 ${date} 的文章数:`, dateGroup.length);
         
             // 创建新闻卡片容器
             const groupContainer = document.createElement('div');
@@ -629,11 +658,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
             // 初始显示前N条新闻 (X显示9条，Crunchbase显示3条)
             const initialCount = currentSource === 'crunchbase.com' ? 3 : 9;
-            const initialNews = dateGroup.slice(0, initialCount);
-            initialNews.forEach(news => {
-                const newsCard = createNewsCard(news);
-                groupContainer.appendChild(newsCard);
+            const initialNews = dateGroup.slice(0, Math.min(initialCount, dateGroup.length));
+            
+            if (initialNews.length === 0) {
+                console.warn(`日期 ${date} 没有可显示的文章`);
+            }
+            
+            initialNews.forEach((news, index) => {
+                try {
+                    console.log(`创建卡片 ${index+1}/${initialNews.length}，标题:`, news.title);
+                    const newsCard = createNewsCard(news);
+                    if (newsCard) {
+                        groupContainer.appendChild(newsCard);
+                    } else {
+                        console.error('创建卡片失败，返回值为空');
+                    }
+                } catch (error) {
+                    console.error('创建卡片时出错:', error);
+                }
             });
+            
+            // 检查是否实际添加了卡片
+            if (groupContainer.children.length === 0) {
+                console.warn(`日期 ${date} 的卡片容器为空，未能创建有效卡片`);
+                groupContainer.innerHTML = '<div class="empty-message">此日期没有可显示的内容</div>';
+            }
         
             newsContainer.appendChild(groupContainer);
 
@@ -660,9 +709,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 准备剩余的新闻卡片
                 const remainingNews = dateGroup.slice(initialCount);
-                remainingNews.forEach(news => {
-                    const newsCard = createNewsCard(news);
-                    extraNewsContainer.appendChild(newsCard);
+                remainingNews.forEach((news, index) => {
+                    try {
+                        console.log(`创建额外卡片 ${index+1}/${remainingNews.length}`);
+                        const newsCard = createNewsCard(news);
+                        if (newsCard) {
+                            extraNewsContainer.appendChild(newsCard);
+                        }
+                    } catch (error) {
+                        console.error('创建额外卡片时出错:', error);
+                    }
                 });
                 
                 // 将额外的新闻容器添加到DOM中
@@ -700,6 +756,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 buttonContainer.appendChild(collapseButton);
             }
         });
+        
+        console.log('卡片渲染完成');
         
         // 更新分页控件
         updatePagination();
@@ -1070,7 +1128,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // 创建单个新闻卡片
     function createNewsCard(news) {
         try {
-            if (!news) return '';
+            if (!news) {
+                console.error('createNewsCard收到空的news对象');
+                return document.createElement('div');
+            }
 
             // 获取日期和时间
             let dateDisplay = "未知日期";
@@ -1091,6 +1152,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 cardWrapper.onclick = function() {
                     window.open(news.url || news.source_url, '_blank');
                 };
+                console.log('添加点击事件，链接:', news.url || news.source_url);
+            } else {
+                console.warn('新闻卡片缺少URL:', news.title);
             }
             
             // 创建统一的三段式卡片结构
@@ -1102,6 +1166,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const cardFooter = document.createElement('div');
             cardFooter.className = 'news-card-footer';
+            
+            // 调试输出
+            console.log('卡片来源:', news.source, '标题:', news.title);
             
             // 根据来源填充内容
             if (news.source === 'Twitter' || news.source === 'X' || news.source === 'x.com') {
@@ -1225,8 +1292,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             return cardWrapper;
         } catch (error) {
-            console.error("Error creating news card:", error);
-            return document.createElement('div');
+            console.error("创建新闻卡片时发生错误:", error, "新闻对象:", news);
+            // 返回一个空的div作为fallback
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'news-card error-card';
+            errorDiv.innerHTML = `<div class="error-message">加载卡片出错</div>`;
+            return errorDiv;
         }
     }
 
@@ -1249,9 +1320,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // HTML转义，防止XSS攻击
-    function escapeHtml(text) {
+    function escapeHTML(text) {
         if (!text) return '';
-        return text
+        return String(text)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
