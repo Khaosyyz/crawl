@@ -417,6 +417,17 @@ def stop_service(service_name, pid_file, port=None):
     return final_status_stopped # 返回最终状态
 
 
+def stop_cleaner_service():
+    """停止数据清洗服务"""
+    print("正在停止数据清洗服务...")
+    stopped = stop_service("数据清洗服务", CLEANER_PID_FILE)
+    if stopped:
+        print("数据清洗服务已停止")
+    else:
+        print("数据清洗服务停止操作可能未完全成功，请检查进程")
+    return stopped
+
+
 def check_dependencies():
     """检查系统依赖文件和目录是否存在"""
     # 检查是否已安装必要的Python包
@@ -760,7 +771,7 @@ def main():
         cleaner_script = os.path.join(CLEAN_DIR, 'cleandata.py')
         if os.path.isfile(cleaner_script):
              start_cleaner_service()
-             print(f"数据清洗服务已启动 (PID: {read_pid(CLEANER_PID_FILE)})\")")
+             print(f"数据清洗服务已启动 (PID: {read_pid(CLEANER_PID_FILE)}) ")
         else:
              print(f"错误: 找不到 {cleaner_script} 文件")
              sys.exit(1)
