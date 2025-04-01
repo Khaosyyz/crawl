@@ -45,7 +45,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(CRAWLER_DIR, exist_ok=True)
 
 # 进程ID文件
-API_PID_FILE = os.path.join(LOG_DIR, "api.pid")
+# API_PID_FILE = os.path.join(LOG_DIR, "api.pid")
 CLEANER_PID_FILE = os.path.join(LOG_DIR, "cleaner.pid")
 SCHEDULER_PID_FILE = os.path.join(LOG_DIR, "scheduler.pid")
 
@@ -53,7 +53,7 @@ SCHEDULER_PID_FILE = os.path.join(LOG_DIR, "scheduler.pid")
 SCHEDULER_LOG_FILE = os.path.join(LOG_DIR, "scheduler.log")
 
 # 服务端口
-API_PORT = 8080
+# API_PORT = 8080
 
 # 全局变量
 scheduler_running = False
@@ -138,106 +138,6 @@ def kill_process_by_port(port):
             logger.error(f"终止进程 (PID: {pid}) 时出错: {e}")
             return False
     return False  # 如果没有找到PID，则操作未成功
-
-
-def start_api_service():
-    """启动API服务"""
-    # 首先检查端口是否被占用
-    if is_port_in_use(API_PORT):
-        pid = get_pid_by_port(API_PORT)
-        if pid:
-            logger.warning(f"端口 {API_PORT} 已被进程 {pid} 占用")
-            print(f"警告: 端口 {API_PORT} 已被另一个进程占用 (PID: {pid})")
-            
-            # 确认是否为我们自己的API服务
-            old_pid = read_pid(API_PID_FILE)
-            if old_pid and old_pid == pid:
-                logger.info(f"API服务已经在运行中 (PID: {pid})")
-                print(f"API服务已经在运行中 (PID: {pid})")
-                return True
-            
-            # 询问是否终止占用端口的进程
-            user_input = input(f"是否终止占用端口 {API_PORT} 的进程? (y/n): ")
-            if user_input.lower() == 'y':
-                kill_process_by_port(API_PORT)
-                time.sleep(1)  # 等待进程终止
-            else:
-                print(f"API服务无法启动: 端口 {API_PORT} 已被占用")
-                return False
-    
-    # 检查是否已经在运行 (通过PID文件)
-    pid = read_pid(API_PID_FILE)
-    if pid and is_pid_running(pid):
-        logger.info(f"API服务已经在运行中 (PID: {pid})")
-        print(f"API服务已经在运行中 (PID: {pid})")
-        return True
-
-    log_file = os.path.join(LOG_DIR, "api.log")
-    with open(log_file, 'a') as log:
-        try:
-            # 确保API文件存在且可执行
-            api_script = os.path.join(API_DIR, 'api.py')
-            if not os.path.isfile(api_script):
-                error_msg = f"找不到API服务文件: {api_script}"
-                logger.error(error_msg)
-                print(f"错误: {error_msg}")
-                return False
-                
-            # 启动前记录日志
-            print("正在启动API服务...")
-            log.write(f"\n\n{'-'*50}\n")
-            log.write(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            log.write(f"{'-'*50}\n\n")
-            log.flush()
-            
-            # 启动进程 - 使用模块方式启动以确保一致性
-            process = subprocess.Popen(
-                [VENV_PYTHON, "-m", "api.api"],
-                stdout=log,
-                stderr=log,
-                cwd=BASE_DIR  # 确保工作目录正确
-            )
-            
-            # 等待一下,确保进程启动
-            time.sleep(2)
-            
-            # 验证进程是否启动
-            if process.poll() is not None:
-                # 进程已经退出
-                error_msg = f"API服务启动后立即退出,返回码: {process.returncode}"
-                logger.error(error_msg)
-                print(f"错误: {error_msg}")
-                return False
-            
-            # 验证端口是否正在监听
-            if not is_port_in_use(API_PORT):
-                error_msg = f"API服务进程已启动,但端口 {API_PORT} 未被监听"
-                logger.error(error_msg)
-                print(f"错误: {error_msg}")
-                # 终止已启动的进程
-                process.terminate()
-                return False
-            
-            # 保存PID
-            write_pid(API_PID_FILE, process.pid)
-            
-            # 再次验证进程是否仍在运行
-            if is_pid_running(process.pid):
-                success_msg = f"API服务已成功启动 (PID: {process.pid})"
-                logger.info(success_msg)
-                print(success_msg)
-                return True
-            else:
-                error_msg = "API服务无法持续运行"
-                logger.error(error_msg)
-                print(f"错误: {error_msg}")
-                return False
-                
-        except Exception as e:
-            error_msg = f"启动API服务时出错: {e}"
-            logger.error(error_msg)
-            print(f"错误: {error_msg}")
-            return False
 
 
 def start_cleaner_service():
@@ -465,6 +365,7 @@ def run_all_crawlers():
 
 def stop_service(service_name, pid_file, port=None):
     """停止指定服务"""
+    logger.info(f"正在尝试停止 {service_name}...") # 添加日志
     # 先通过PID文件停止服务
     pid = read_pid(pid_file)
     pid_stopped = False
@@ -496,21 +397,31 @@ def stop_service(service_name, pid_file, port=None):
                 time.sleep(1)
                 if is_pid_running(port_pid):
                     os.kill(port_pid, signal.SIGKILL)
-                logger.info(f"已终止占用端口 {port} 的进程 (PID: {port_pid})")
+                logger.info(f"已终止占用端口 {port} 的进程 (PID: {port_pid})") # 保持日志
             except OSError as e:
                 logger.error(f"终止进程 (PID: {port_pid}) 时出错: {e}")
-    
+            # 即使出错，也尝试继续清除 PID 文件
+
     # 清除PID文件
     if os.path.exists(pid_file):
-        os.remove(pid_file)
-    
-    return pid_stopped or (port and not is_port_in_use(port))
+        try: # 添加 try-except 块
+            os.remove(pid_file)
+            logger.info(f"已移除 {service_name} 的 PID 文件: {pid_file}")
+        except OSError as e:
+            logger.error(f"移除 PID 文件 {pid_file} 时出错: {e}")
+    else:
+        logger.warning(f"未找到 {service_name} 的 PID 文件: {pid_file}") # 添加警告
+
+    final_status_stopped = pid_stopped or (port and not is_port_in_use(port))
+    logger.info(f"{service_name} 停止操作完成，最终状态: {'已停止' if final_status_stopped else '可能仍在运行'}")
+    return final_status_stopped # 返回最终状态
 
 
 def check_dependencies():
     """检查系统依赖文件和目录是否存在"""
     # 检查是否已安装必要的Python包
-    required_packages = ['flask', 'schedule', 'pytz', 'selenium', 'requests']
+    # 确保添加 Flask 和 Flask-Cors
+    required_packages = ['schedule', 'pytz', 'selenium', 'requests', 'pymongo']
     missing_packages = []
     
     try:
@@ -533,7 +444,7 @@ def check_dependencies():
         print(f"pip install {' '.join(missing_packages)}")
     
     required_files = [
-        os.path.join(API_DIR, 'api.py'),
+        # os.path.join(API_DIR, 'api.py'),
         os.path.join(CLEAN_DIR, 'cleandata.py'),
     ]
     
@@ -570,389 +481,249 @@ def check_dependencies():
 
 
 def start_all():
-    """启动所有服务"""
-    print("正在启动AI资讯聚合系统...")
-    
+    """启动所有本地服务 (Cleaner & Scheduler)"""
+    print("正在启动本地后台服务...")
+
     # 首先检查依赖
     if not check_dependencies():
-        print("启动失败: 系统缺少必要的文件或目录")
+        print("启动失败: 系统缺少必要的文件、目录或依赖库")
         return False
-    
+
     # 启动数据清洗服务
     print("正在启动数据清洗服务...")
     cleaner_success = start_cleaner_service()
-    if not cleaner_success:
-        print("警告: 数据清洗服务启动失败,将再次尝试")
-        # 再次尝试启动
-        time.sleep(1)  # 等待1秒后重试
-        cleaner_success = start_cleaner_service()
-    
+
     # 启动爬虫定时任务
     print("正在启动爬虫定时任务...")
     scheduler_success = start_scheduler()
-    if not scheduler_success:
-        print("警告: 爬虫定时任务启动失败,将再次尝试")
-        # 再次尝试启动
-        time.sleep(1)  # 等待1秒后重试
-        scheduler_success = start_scheduler()
-    
+
     # 打印启动结果汇总
-    print("\n===== 启动结果汇总 =====")
-    
+    print("\n===== 本地服务启动结果汇总 =====")
+
     # 读取进程ID
+    # api_pid = read_pid(API_PID_FILE) # 移除
     cleaner_pid = read_pid(CLEANER_PID_FILE)
     scheduler_pid = read_pid(SCHEDULER_PID_FILE)
-    
+
+    # API服务状态 (移除)
+    # if api_success and api_pid and is_pid_running(api_pid) and is_port_in_use(API_PORT):
+    # ...
+
     # 数据清洗服务状态
     if cleaner_success and cleaner_pid and is_pid_running(cleaner_pid):
         print(f"数据清洗服务: 成功启动 (PID: {cleaner_pid})")
     else:
-        print("数据清洗服务: 启动失败 ✗ - 请检查logs/cleaner.log获取更多信息")
-    
+        print(f"数据清洗服务: 启动失败 ✗ - 请检查logs/cleaner.log获取更多信息")
+
     # 爬虫定时任务状态
     if scheduler_success and scheduler_pid and is_pid_running(scheduler_pid):
         print(f"爬虫定时任务: 成功启动 (PID: {scheduler_pid})")
     else:
-        print("爬虫定时任务: 启动失败 ✗ - 请检查logs/scheduler.log获取更多信息")
-    
+        print(f"爬虫定时任务: 启动失败 ✗ - 请检查logs/scheduler.log获取更多信息")
+
     # 服务启动总结
-    if cleaner_success and scheduler_success:
-        print("\n所有服务已启动成功！")
+    if cleaner_success and scheduler_success: # 移除 api_success
+        print("\n所有本地核心服务已尝试启动成功！")
         return True
     else:
-        print("\n警告: 部分服务未能成功启动,请检查日志文件了解详情")
+        print("\n警告: 部分本地核心服务未能成功启动,请检查日志文件了解详情")
         return False
 
 
 def stop_all():
-    """停止所有服务"""
-    print("正在停止所有服务...")
-    cleaner_stopped = stop_service("数据清洗服务", CLEANER_PID_FILE)
+    """停止所有本地服务 (Cleaner & Scheduler)"""
+    print("正在停止所有本地服务...")
+    # api_stopped = stop_api_service() # 移除
+    cleaner_stopped = stop_cleaner_service()
     scheduler_stopped = stop_scheduler()
-    
-    print("所有服务已停止")
+
+    print("\n所有本地服务已尝试停止")
     return 0
 
 
 def status():
-    """查看各服务状态"""
+    """查看本地服务状态"""
+    # 检查API服务 (移除)
+    # api_pid = read_pid(API_PID_FILE)
+    # ...
+
     # 检查清洗服务
     cleaner_pid = read_pid(CLEANER_PID_FILE)
     cleaner_running = cleaner_pid and is_process_running(cleaner_pid)
-    
+
     # 检查调度器
     scheduler_pid = read_pid(SCHEDULER_PID_FILE)
     scheduler_running = scheduler_pid and is_process_running(scheduler_pid)
-    
+
     # 打印状态
-    print("===== 服务状态 =====")
-    
+    print("===== 本地服务状态 =====")
+
+    # API服务状态 (移除)
+    # print(api_status_str)
+
     # 清洗服务状态
-    print(f"数据清洗服务: {'运行中' if cleaner_running else '已停止'} " + 
-         (f"(PID: {cleaner_pid})" if cleaner_running else ""))
-         
+    print(f"数据清洗服务: {'运行中' if cleaner_running else '已停止'} " +
+          (f"(PID: {cleaner_pid})" if cleaner_running else ""))
+
     # 调度器状态
-    print(f"爬虫定时任务: {'运行中' if scheduler_running else '已停止'} " + 
+    print(f"爬虫定时任务: {'运行中' if scheduler_running else '已停止'} " +
          (f"(PID: {scheduler_pid})" if scheduler_running else ""))
 
 
 def start_scheduler():
-    """启动定时任务调度器"""
+    """启动定时任务调度器 (运行 scheduler_loop.py)"""
     # 检查是否已经在运行
     pid = read_pid(SCHEDULER_PID_FILE)
     if pid and is_pid_running(pid):
         logger.warning("调度器已经在运行中")
         print(f"爬虫定时任务调度器已经在运行中 (PID: {pid})")
         return True
-    
-    # 内联方式创建调度器脚本
-    scheduler_script = """#!/usr/bin/env python3
-# 爬虫调度器脚本
-import os
-import time
-import datetime
-import subprocess
-import signal
-import sys
-import schedule
-import logging
-import glob
 
-# 日志目录
-log_dir = 'logs'
-os.makedirs(log_dir, exist_ok=True)
+    # 运行外部 scheduler_loop.py 脚本
+    scheduler_loop_script = os.path.join(BASE_DIR, 'scheduler_loop.py')
+    if not os.path.isfile(scheduler_loop_script):
+        error_msg = f"找不到调度器脚本文件: {scheduler_loop_script}"
+        logger.error(error_msg)
+        print(f"错误: {error_msg}")
+        return False
 
-# 尝试导入自定义日志处理模块
-try:
-    sys.path.append(log_dir)
-    from log_handler import setup_logger, start_log_cleanup_thread
-    
-    # 配置日志记录
-    logger = setup_logger(
-        name="scheduler",
-        log_file=os.path.join(log_dir, "scheduler.log"),
-        level=logging.INFO,
-        console_output=True
-    )
-    
-    # 启动日志清理线程
-    cleanup_thread = start_log_cleanup_thread(log_dir)
-    
-except ImportError:
-    # 如果导入失败，回退到标准日志配置
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(os.path.join(log_dir, 'scheduler.log')),
-            logging.StreamHandler()
-        ]
-    )
-    logger = logging.getLogger('scheduler')
-    logger.warning("无法导入自定义日志处理模块，使用标准日志配置")
-
-# 记录PID到文件
-SCHEDULER_PID_FILE = os.path.join(log_dir, "scheduler.pid")
-with open(SCHEDULER_PID_FILE, 'w') as f:
-    f.write(str(os.getpid()))
-
-# 全局变量记录最后一次爬虫运行时间
-last_x_crawler_run = 0
-last_crunchbase_crawler_run = 0
-x_crawler_process = None
-crunchbase_crawler_process = None
-
-
-def run_x_crawler():
-    # 运行X爬虫并监控其状态
-    global last_x_crawler_run, x_crawler_process
-    
-    # 检查前一个进程是否还在运行
-    if x_crawler_process and x_crawler_process.poll() is None:
-        # 爬虫正在运行，不需要重启
-        logger.info("X爬虫正在运行，不需要重启")
-        return
-    
-    # 记录当前时间为最后一次运行时间
-    last_x_crawler_run = time.time()
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_file = os.path.join(log_dir, f'x_crawler_{timestamp}.log')
-    
-    # 删除旧的X爬虫日志文件
-    for old_log in glob.glob(os.path.join(log_dir, 'x_crawler_*.log')):
-        if old_log != log_file:  # 不删除将要创建的日志文件
-            try:
-                os.remove(old_log)
-                logger.info(f"删除旧日志文件: {old_log}")
-            except Exception as e:
-                logger.error(f"删除旧日志文件失败: {e}")
-    
-    logger.info(f"启动X爬虫，日志文件：{log_file}")
-    
-    with open(log_file, 'w', buffering=1) as f:  # 使用buffering=1启用行缓冲
-        python_path = sys.executable  # 使用当前Python解释器路径
-        x_crawler_process = subprocess.Popen(
-            [python_path, '-u', 'crawlers/X/x.py'],  # 添加-u参数禁用缓冲
-            stdout=f,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,  # 使用行缓冲
-            env=dict(os.environ, PYTHONUNBUFFERED="1")  # 设置环境变量禁用Python缓冲
-        )
-
-
-def run_crunchbase_crawler():
-    # 运行Crunchbase爬虫并监控其状态
-    global last_crunchbase_crawler_run, crunchbase_crawler_process
-    
-    # 检查前一个进程是否还在运行
-    if crunchbase_crawler_process and crunchbase_crawler_process.poll() is None:
-        # 爬虫正在运行，不需要重启
-        logger.info("Crunchbase爬虫正在运行，不需要重启")
-        return
-    
-    # 记录当前时间为最后一次运行时间
-    last_crunchbase_crawler_run = time.time()
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_file = os.path.join(log_dir, f'crunchbase_crawler_{timestamp}.log')
-    
-    # 删除旧的Crunchbase爬虫日志文件
-    for old_log in glob.glob(os.path.join(log_dir, 'crunchbase_crawler_*.log')):
-        if old_log != log_file:  # 不删除将要创建的日志文件
-            try:
-                os.remove(old_log)
-                logger.info(f"删除旧日志文件: {old_log}")
-            except Exception as e:
-                logger.error(f"删除旧日志文件失败: {e}")
-    
-    logger.info(f"启动Crunchbase爬虫，日志文件：{log_file}")
-    
-    with open(log_file, 'w', buffering=1) as f:  # 使用buffering=1启用行缓冲
-        python_path = sys.executable  # 使用当前Python解释器路径
-        crunchbase_crawler_process = subprocess.Popen(
-            [python_path, '-u', 'crawlers/Crunchbase/crunchbase.py'],
-            stdout=f,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            env=dict(os.environ, PYTHONUNBUFFERED="1")
-        )
-
-
-# 设置调度
-schedule.every(3).hours.do(run_x_crawler)
-schedule.every(12).hours.do(run_crunchbase_crawler)
-
-# 首次运行
-run_x_crawler()
-run_crunchbase_crawler()
-
-# 主循环
-try:
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-except KeyboardInterrupt:
-    logger.warning("调度器被手动终止")
-except Exception as e:
-    logger.error(f"调度器出错: {e}")
-"""
-    
-    # 启动脚本
-    log_file = SCHEDULER_LOG_FILE
+    log_file = SCHEDULER_LOG_FILE # Use the same log file defined earlier
     with open(log_file, 'a') as log:
         try:
             # 记录启动信息
-            print("正在启动爬虫定时任务调度器...")
+            print("正在启动爬虫定时任务调度器 (scheduler_loop.py)...")
             log.write(f"\n\n{'-'*50}\n")
-            log.write(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            log.write(f"启动时间 (由 main.py 发起): {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             log.write(f"{'-'*50}\n\n")
             log.flush()
-            
-            # 使用内联方式启动调度器，不创建临时文件
+
+            # 使用 subprocess 运行 scheduler_loop.py
             process = subprocess.Popen(
-                [VENV_PYTHON, "-c", scheduler_script],
+                [VENV_PYTHON, scheduler_loop_script], # 直接运行脚本
                 stdout=log,
                 stderr=log,
-                start_new_session=True
+                cwd=BASE_DIR, # Set working directory
+                start_new_session=True # Run in a new session to detach from main.py's lifecycle if needed
             )
-            
-            time.sleep(3)  # 给调度器一些启动时间
-            
-            # 检查调度器是否正常启动
-            if process.poll() is None:
-                # 进程仍在运行,说明启动成功
-                print(f"定时任务调度器已启动,PID: {process.pid}")
-                with open(log_file, 'a') as log:
-                    log.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - 调度器启动成功,PID: {process.pid}\n")
-                # 确保PID文件存在
-                write_pid(SCHEDULER_PID_FILE, process.pid)
-                return True
-            else:
-                # 进程已结束,说明启动失败
+
+            # 等待 scheduler_loop.py 创建自己的 PID 文件并启动
+            time.sleep(3)  # 给调度器脚本一些启动时间
+
+            # 检查调度器 PID 文件是否存在且进程在运行
+            scheduler_pid = read_pid(SCHEDULER_PID_FILE)
+            if scheduler_pid and is_pid_running(scheduler_pid):
+                # 确认启动的进程 PID 与文件中的 PID 一致
+                if process.pid == scheduler_pid:
+                     print(f"定时任务调度器已启动 (PID: {scheduler_pid})")
+                     logger.info(f"定时任务调度器 (scheduler_loop.py) 启动成功，PID: {scheduler_pid}")
+                     return True
+                else:
+                    # PID 不匹配，可能 scheduler_loop.py 内部启动失败或 PID 文件写入延迟
+                    logger.error(f"启动的进程 PID ({process.pid}) 与调度器 PID 文件中的 PID ({scheduler_pid}) 不匹配。")
+                    # 尝试终止我们启动的进程
+                    process.terminate()
+                    return False
+            elif process.poll() is not None:
+                # 如果我们启动的 Popen 进程已经退出，说明 scheduler_loop.py 启动失败
                 stdout, stderr = process.communicate()
-                error_message = stderr.decode('utf-8') if stderr else "未知错误"
+                error_message = stderr.decode('utf-8') if stderr else f"进程退出码: {process.returncode}"
                 print(f"定时任务调度器启动失败: {error_message}")
-                with open(log_file, 'a') as log:
-                    log.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - 调度器启动失败: {error_message}\n")
+                logger.error(f"启动 scheduler_loop.py 失败: {error_message}")
                 return False
-                
+            else:
+                # 进程仍在运行，但 PID 文件未找到或 PID 无效
+                logger.warning(f"调度器进程 (PID: {process.pid}) 可能正在运行，但无法通过 PID 文件确认。请检查日志。")
+                # 我们可以选择返回 True 并假设它在运行，或者返回 False 表示不确定
+                # 暂时返回 True，但提示用户检查
+                print(f"警告: 调度器进程 (PID: {process.pid}) 已启动，但状态确认不完整。请检查日志。")
+                return True # Or False depending on desired strictness
+
         except Exception as e:
-            error_msg = f"启动定时任务调度器出错: {e}"
+            error_msg = f"启动定时任务调度器 (scheduler_loop.py) 时出错: {e}"
             print(error_msg)
+            logger.error(error_msg)
             log.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {error_msg}\n")
             return False
 
 
 def stop_scheduler():
-    """停止定时任务调度器"""
+    """停止定时任务调度器 (scheduler_loop.py)"""
+    # 停止逻辑保持不变，因为它依赖于 SCHEDULER_PID_FILE，
+    # 而 scheduler_loop.py 负责创建和删除这个文件。
     pid = read_pid(SCHEDULER_PID_FILE)
     if pid and is_process_running(pid):
-        stop_service("定时任务调度器", SCHEDULER_PID_FILE)
-        print("定时任务调度器已停止")
+        print("正在停止定时任务调度器...") # Add print statement here
+        stopped = stop_service("定时任务调度器", SCHEDULER_PID_FILE)
+        if stopped:
+            print("定时任务调度器已停止")
+        else:
+            print("定时任务调度器停止操作可能未完全成功，请检查进程")
+        return stopped
     else:
-        print("定时任务调度器未运行")
-    return True
+        print("定时任务调度器未运行或无法找到 PID 文件")
+        # Ensure PID file is removed if process is not running but file exists
+        if os.path.exists(SCHEDULER_PID_FILE):
+            try:
+                os.remove(SCHEDULER_PID_FILE)
+                logger.warning(f"调度器未运行，但 PID 文件存在，已移除: {SCHEDULER_PID_FILE}")
+            except OSError as e:
+                 logger.error(f"尝试移除无效调度器的 PID 文件时出错: {e}")
+        return True # Consider it stopped if not running
 
 
 def start(args=None):
-    """启动系统的所有组件"""
-    print("正在启动AI资讯聚合系统...")
-    
-    # 检查Python包依赖
-    try:
-        import pkg_resources
-        
-        # 从requirements.txt读取依赖列表
-        requirements_path = os.path.join(BASE_DIR, "requirements.txt")
-        if os.path.exists(requirements_path):
-            with open(requirements_path, 'r') as f:
-                dependencies = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-                
-            # 验证每个依赖是否已安装
-            missing_deps = []
-            for dep in dependencies:
-                try:
-                    # 移除版本限制，只检查包名
-                    package_name = dep.split('==')[0].split('>=')[0].split('<=')[0].strip()
-                    pkg_resources.get_distribution(package_name)
-                except pkg_resources.DistributionNotFound:
-                    missing_deps.append(package_name)
-                    
-            if missing_deps:
-                print(f"警告: 以下Python包未安装: {', '.join(missing_deps)}")
-                print("建议使用 'pip install -r requirements.txt' 安装所有依赖")
-        
-    except ImportError:
-        print("警告: 无法导入pkg_resources模块,跳过Python包依赖检查")
-        print("提示: 这通常意味着setuptools包未正确安装")
+    """启动系统的本地组件 (Cleaner & Scheduler)"""
+    print("正在启动本地服务...")
 
-    # 不再启动API服务
-    # success_api = start_api_service()
-    
+    # 检查依赖 (不再检查 Flask)
+    # ...
+
+    # # 不再启动API服务
+    # success_api = start_api_service() # 注释掉
+
     # 启动数据清洗服务
     success_cleaner = start_cleaner_service()
-    
+
     # 启动爬虫定时任务
     success_scheduler = start_scheduler()
-    
+
     # 显示启动结果摘要
-    print("\n===== 启动结果汇总 =====")
-    # print(f"API服务: {'成功启动 (PID: ' + str(read_pid(API_PID_FILE)) + ')' if success_api else '启动失败 ✗ - 请检查logs/api.log获取更多信息'}")
+    print("\n===== 本地服务启动结果汇总 =====")
+    # print(f"API服务: ...") # 移除 API 状态显示
     print(f"数据清洗服务: {'成功启动 (PID: ' + str(read_pid(CLEANER_PID_FILE)) + ')' if success_cleaner else '启动失败 ✗ - 请检查logs/cleaner.log获取更多信息'}")
     print(f"爬虫定时任务: {'成功启动 (PID: ' + str(read_pid(SCHEDULER_PID_FILE)) + ')' if success_scheduler else '启动失败 ✗ - 请检查logs/scheduler.log获取更多信息'}")
-    
-    # if not (success_api and success_cleaner and success_scheduler):
-    if not (success_cleaner and success_scheduler):
-        print("\n警告: 部分服务未能成功启动,请检查日志文件了解详情")
+
+    if not (success_cleaner and success_scheduler): # 移除 success_api
+        print("\n警告: 部分本地服务未能成功启动,请检查日志文件了解详情")
         return 1
-        
-    print("\n系统启动完成! 使用 'python main.py status' 查看系统状态")
+
+    print("\n本地服务启动完成! 使用 'python main.py status' 查看状态")
     return 0
 
 def stop(args=None):
-    """停止系统的所有组件"""
-    print("正在停止AI资讯聚合系统...")
-    
-    # 不再停止API服务
-    # stop_api_service()
-    
+    """停止系统的本地组件 (Cleaner & Scheduler)"""
+    print("正在停止本地服务...")
+
+    # # 不再停止API服务
+    # stop_api_service() # 注释掉
+
     # 停止数据清洗服务
     stop_cleaner_service()
-    
+
     # 停止爬虫定时任务
     stop_scheduler()
-    
-    print("\n系统已停止")
+
+    print("\n本地服务已尝试停止")
     return 0
 
 def main():
     """主函数,解析命令行参数并执行相应操作"""
-    parser = argparse.ArgumentParser(description="AI资讯聚合系统控制程序")
+    parser = argparse.ArgumentParser(description="AI资讯聚合系统 - 后台服务控制程序")
+    # 更新描述和选项，移除 API 相关
     parser.add_argument('action', choices=['start', 'stop', 'restart', 'status', 'crawler', 'cleaner', 'scheduler'],
-                        help='要执行的操作: start启动所有服务, stop停止所有服务, restart重启所有服务, ' +
-                             'status查看状态, crawler运行爬虫, cleaner仅启动清洗服务, ' + 
-                             'scheduler仅启动调度器')
+                        help='要执行的操作: start启动所有本地服务 (cleaner, scheduler), stop停止所有本地服务, ' +
+                             'restart重启所有本地服务, status查看本地服务状态, crawler运行所有爬虫一次, ' +
+                             'cleaner仅启动清洗服务, scheduler仅启动调度器')
     
     if len(sys.argv) == 1:
         parser.print_help()
@@ -961,9 +732,11 @@ def main():
     args = parser.parse_args()
     
     if args.action == 'start':
+        # start_all() 现在只启动本地服务
         if not start_all():
             sys.exit(1)
     elif args.action == 'stop':
+        # stop_all() 现在只停止本地服务
         stop_all()
     elif args.action == 'restart':
         stop_all()
@@ -971,28 +744,35 @@ def main():
         if not start_all():
             sys.exit(1)
     elif args.action == 'status':
+        # status() 现在只显示本地服务状态
         status()
     elif args.action == 'crawler':
+        # ... (crawler 逻辑不变，假设其下有代码或 pass)
+        # 如果这里也被注释了，也需要加 pass
         # 检查依赖
         if not check_dependencies():
-            print("启动爬虫失败: 系统缺少必要的文件或目录")
-            sys.exit(1)
+             print("启动爬虫失败: 系统缺少必要的文件或目录")
+             sys.exit(1)
         run_all_crawlers()
     elif args.action == 'cleaner':
+        # ... (cleaner 逻辑不变，假设其下有代码或 pass)
+        # 如果这里也被注释了，也需要加 pass
         cleaner_script = os.path.join(CLEAN_DIR, 'cleandata.py')
         if os.path.isfile(cleaner_script):
-            start_cleaner_service()
-            print(f"数据清洗服务已启动 (PID: {read_pid(CLEANER_PID_FILE)})")
+             start_cleaner_service()
+             print(f"数据清洗服务已启动 (PID: {read_pid(CLEANER_PID_FILE)})\")")
         else:
-            print(f"错误: 找不到 {cleaner_script} 文件")
-            sys.exit(1)
+             print(f"错误: 找不到 {cleaner_script} 文件")
+             sys.exit(1)
     elif args.action == 'scheduler':
+        # ... (scheduler 逻辑不变，假设其下有代码或 pass)
+        # 如果这里也被注释了，也需要加 pass
         if not discover_crawlers():
-            print("错误: 未发现任何爬虫脚本")
-            sys.exit(1)
+             print("错误: 未发现任何爬虫脚本")
+             sys.exit(1)
         start_scheduler()
-        print("爬虫定时任务已启动,每3小时会自动运行一次爬虫")
+        print("爬虫定时任务已启动, 配置见 schedule_config.json") # 更新提示
 
-
+# 确保这部分在顶层，没有额外缩进
 if __name__ == "__main__":
     main() 
