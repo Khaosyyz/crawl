@@ -111,7 +111,7 @@ class SystemPrompts:
 第三步：如果内容与AI相关，请按以下格式返回清洗后的内容：
 
 标题: [根据翻译后的内容自拟新闻标题，确保简洁明了(25字以内)且包含关键信息，突出公司名称、技术名称或产品名称，避免使用"关于"、"如何"等模糊词语]
-正文: [翻译后的内容，整理为清晰简洁的行业新闻格式，分段合理，删除冗余信息，如原始内容中包含URL链接，保留原始URL]
+正文: [翻译后的内容，整理为清晰简洁的行业新闻格式，分段合理，删除冗余信息。如原始内容中包含URL链接，根据链接内容和上下文，使用合适的描述，例如"——报告链接：@URL"、"——图片来源：@URL"、"——视频来源：@URL"、"——资讯来源：@URL"、"——白皮书链接：@URL"等，放在相关段落后]
 作者: [原作者名] (@[用户名])
 粉丝数: [粉丝数值]
 点赞数: [点赞数值]
@@ -125,7 +125,7 @@ class SystemPrompts:
 4. 正文必须是翻译后的中文内容，以专业新闻的语气呈现，保持原文的信息完整性
 5. 保留专有名词的中文翻译，重要的技术词汇保留英文原文标注，如"大型语言模型(Large Language Model, LLM)"
 6. 英文和数字前后需加空格提高可读性
-7. 对原文中的源链接URL保持原样，不要翻译或简化URL
+7. 对原文中的URL链接，根据上下文判断链接类型，选择合适的描述文本（如报告链接、图片来源、视频链接、资讯来源、白皮书等），使用"——[适当描述]：@URL"的格式展示
 8. 所有返回必须是结构化的字段，便于JSON解析
 9. 如果翻译后判断内容与AI无关，则不返回任何内容
 10. 不在返回内容中添加额外说明或注释
@@ -144,7 +144,7 @@ class SystemPrompts:
 第三步：请按以下格式返回清洗后的内容：
 
 标题: [格式为"公司名+融资金额+轮次"，例如"AI初创公司XXX完成1000万美元A轮融资"，确保简洁明了且符合新闻标题规范]
-正文: [翻译后的内容，整理为多段式新闻正文，第一段概述融资情况，后续段落介绍公司背景、技术、产品及用途，最后段落可提及投资方信息。确保段落分明，语句通顺，可读性高]
+正文: [翻译后的内容，整理为多段式新闻正文，第一段概述融资情况，后续段落介绍公司背景、技术、产品及用途，最后段落可提及投资方信息。确保段落分明，语句通顺，可读性高。如原始内容中包含URL链接，根据链接内容和上下文，选择合适的描述文本，例如"——公司官网：@URL"、"——融资公告：@URL"、"——产品介绍：@URL"等，放在相关段落后]
 作者: [原作者姓名，若无则填"未提供"]
 公司: [相关公司名称，必须准确提取]
 融资轮次: [轮次信息，如种子轮、A轮等，必须准确提取]
@@ -159,12 +159,13 @@ class SystemPrompts:
 4. 正文必须采用专业新闻报道格式，分成3-5个段落，每段不超过3-4个句子
 5. 重要的公司名称、产品名称等专有名词需保留英文原文标注，如"人工智能公司DeepMind"
 6. 英文和数字前后需加空格提高可读性
-7. 务必准确提取融资轮次、融资金额和投资方信息，这些是关键数据
-8. 所有返回必须是结构化的字段，便于JSON解析
-9. 如果翻译后判断内容与AI行业投资无关，则不返回任何内容
-10. 不在返回内容中添加额外说明或注释
-11. 如原文确实没有提供某字段信息，请使用'未提供'填充
-12. 所有内容必须有明确边界，每个字段单独成行"""
+7. 对原文中的URL链接，根据上下文判断链接类型，选择合适的描述文本（如公司官网、融资公告、产品介绍等），使用"——[适当描述]：@URL"的格式展示
+8. 务必准确提取融资轮次、融资金额和投资方信息，这些是关键数据
+9. 所有返回必须是结构化的字段，便于JSON解析
+10. 如果翻译后判断内容与AI行业投资无关，则不返回任何内容
+11. 不在返回内容中添加额外说明或注释
+12. 如原文确实没有提供某字段信息，请使用'未提供'填充
+13. 所有内容必须有明确边界，每个字段单独成行"""
     
     @staticmethod
     def get_default_prompt() -> str:
@@ -405,24 +406,61 @@ class XDataProcessor(DataProcessor):
             parsed = {}
             
             # 提取字段
+            current_field = None
+            content_lines = []
+            
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
                 
-                if ':' in line:
+                if ':' in line and not line.startswith('http') and not line.startswith('——报告链接：@http'):
+                    # 如果有新字段开始，先保存之前收集的正文内容
+                    if current_field == 'content' and content_lines:
+                        parsed['content'] = '\n'.join(content_lines)
+                        content_lines = []
+                    
                     key, value = line.split(':', 1)
                     key = key.strip()
                     value = value.strip()
+                    current_field = None
                     
                     if key == '标题':
                         parsed['title'] = value
+                        current_field = 'title'
                     elif key == '正文':
-                        parsed['content'] = TextUtils.standardize_punctuation(value)
+                        # 开始收集正文内容，而不是直接赋值
+                        content_lines = [value] if value else []
+                        current_field = 'content'
                     elif key == '作者':
                         parsed['author'] = value
+                        current_field = 'author'
+                    elif key == '粉丝数':
+                        try:
+                            parsed['followers'] = int(value.replace(',', ''))
+                        except (ValueError, TypeError):
+                            parsed['followers'] = original_item.get('raw', {}).get('followers_count', 0)
+                    elif key == '点赞数':
+                        try:
+                            parsed['likes'] = int(value.replace(',', ''))
+                        except (ValueError, TypeError):
+                            parsed['likes'] = original_item.get('raw', {}).get('favorite_count', 0)
+                    elif key == '转发数':
+                        try:
+                            parsed['retweets'] = int(value.replace(',', ''))
+                        except (ValueError, TypeError):
+                            parsed['retweets'] = original_item.get('raw', {}).get('retweet_count', 0)
                     elif key == '日期':
                         parsed['date_time'] = value
+                        current_field = 'date_time'
+                else:
+                    # 继续收集当前字段的内容
+                    if current_field == 'content':
+                        content_lines.append(line)
+            
+            # 保存最后收集的正文内容
+            if current_field == 'content' and content_lines:
+                parsed['content'] = '\n'.join(content_lines)
             
             # 验证必要字段 - 如果缺少标题，则使用原始文本生成一个
             if 'title' not in parsed or not parsed['title']:
@@ -466,9 +504,9 @@ class XDataProcessor(DataProcessor):
                 'date_time': parsed.get('date_time', original_item.get('date_time', '')),
                 'source': 'x.com',
                 'source_url': original_item.get('source_url', original_item.get('raw', {}).get('url', '')),
-                'likes': original_item.get('raw', {}).get('favorite_count', 0),
-                'retweets': original_item.get('raw', {}).get('retweet_count', 0),
-                'followers': original_item.get('raw', {}).get('followers_count', 0),
+                'likes': parsed.get('likes', original_item.get('raw', {}).get('favorite_count', 0)),
+                'retweets': parsed.get('retweets', original_item.get('raw', {}).get('retweet_count', 0)),
+                'followers': parsed.get('followers', original_item.get('raw', {}).get('followers_count', 0)),
                 'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
@@ -587,34 +625,58 @@ class CrunchbaseDataProcessor(DataProcessor):
             parsed = {}
             
             # 提取字段
+            current_field = None
+            content_lines = []
+            
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
                 
-                if ':' in line:
+                if ':' in line and not line.startswith('http') and not line.startswith('——报告链接：@http'):
+                    # 如果有新字段开始，先保存之前收集的正文内容
+                    if current_field == 'content' and content_lines:
+                        parsed['content'] = '\n'.join(content_lines)
+                        content_lines = []
+                    
                     key, value = line.split(':', 1)
                     key = key.strip()
                     value = value.strip()
+                    current_field = None
                     
                     if key == '标题':
                         parsed['title'] = value
+                        current_field = 'title'
                     elif key == '正文':
-                        # 为Crunchbase内容应用特殊格式化
-                        parsed['content'] = TextUtils.format_crunchbase_content(value)
-                        parsed['content'] = TextUtils.standardize_punctuation(parsed['content'])
+                        # 开始收集正文内容，而不是直接赋值
+                        content_lines = [value] if value else []
+                        current_field = 'content'
                     elif key == '作者':
                         parsed['author'] = value
+                        current_field = 'author'
                     elif key == '公司':
                         parsed['company'] = value
+                        current_field = 'company'
                     elif key == '融资轮次':
                         parsed['funding_round'] = value
+                        current_field = 'funding_round'
                     elif key == '融资金额':
                         parsed['funding_amount'] = value
+                        current_field = 'funding_amount'
                     elif key == '投资方':
                         parsed['investors'] = value
+                        current_field = 'investors'
                     elif key == '日期':
                         parsed['date_time'] = value
+                        current_field = 'date_time'
+                else:
+                    # 继续收集当前字段的内容
+                    if current_field == 'content':
+                        content_lines.append(line)
+            
+            # 保存最后收集的正文内容
+            if current_field == 'content' and content_lines:
+                parsed['content'] = '\n'.join(content_lines)
             
             # 验证必要字段 - 如果缺少标题，则尝试从原始数据生成
             if 'title' not in parsed or not parsed['title']:
