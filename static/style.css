@@ -1232,31 +1232,38 @@ footer {
     position: static;
     height: auto;
     background: none;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     margin: 10px auto;
     padding: 6px 15px;
-    border: 1px solid #dee2e6;
-    border-radius: 20px;
+    border: none;
+    border-radius: 0;
     font-size: 0.9rem;
-    width: auto;
+    width: 100%;
+    color: #007bff;
+}
+
+.content-collapsible:not(.collapsed) .content-fade-button i {
+    transform: rotate(180deg);
+    margin-right: 6px;
 }
 
 /* 为展开后的按钮添加样式 */
 .expanded-button {
-    width: fit-content !important;
+    width: 100% !important;
     margin: 10px auto !important;
-    border: 1px solid #dee2e6 !important;
-    border-radius: 20px !important;
+    border: none !important;
+    border-radius: 0 !important;
     padding: 6px 16px !important;
     background: none !important;
     color: #007bff !important;
     box-shadow: none !important;
+    text-align: center;
 }
 
 .expanded-button:hover {
-    background-color: #f8f9fa !important;
+    background-color: transparent !important;
     color: #0056b3 !important;
 }
 

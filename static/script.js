@@ -479,63 +479,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log(`请求数据 (${sourceKey}): ${apiUrl}`);
 
-        try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) {
-                let apiErrorMsg = `HTTP 错误! 状态: ${response.status}`;
-                 try { /* ... */ } catch (parseError) { /* ... */ }
-                 throw new Error(apiErrorMsg);
-            }
-            const data = await response.json();
-            console.log(`收到数据 (${sourceKey}):`, data);
+        // 最大重试次数
+        const maxRetries = 2;
+        let retryCount = 0;
+        let success = false;
 
-            if (data.status === 'success') {
-                // 根据API端点不同处理不同的返回数据结构
-                if (USE_TEST_API) {
-                    // 测试API没有日期范围和日期分页，使用默认值
-                    const defaultDateRange = {
-                        start: '2025-03-01',
-                        end: '2025-04-01'
-                    };
-                    updateDateInfo(sourceKey, defaultDateRange, 1, 1);
-                    updateDatePaginationButtons(sourceKey, 1, 1);
-                    
-                    // 调用实际的渲染函数
-                    if (sourceKey === 'x') {
-                        renderXArticles(data.data, sourceKey);
-                    } else {
-                        renderCrunchbaseArticles(data.data, sourceKey);
-                    }
-                    
-                    // 渲染文章分页
-                    const totalArticlePages = data.total > 0 ? Math.ceil(data.total / ARTICLES_PER_PAGE[sourceKey]) : 0;
-                    renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
-                } else {
-                    // 原始API有日期范围和日期分页
-                    updateDateInfo(sourceKey, data.date_range, sourceState.currentDatePage, data.total_date_pages);
-                    updateDatePaginationButtons(sourceKey, sourceState.currentDatePage, data.total_date_pages);
-
-                    // 调用实际的渲染函数
-                    if (sourceKey === 'x') {
-                        renderXArticles(data.data, sourceKey);
-                    } else {
-                        renderCrunchbaseArticles(data.data, sourceKey);
-                    }
-
-                    // 渲染文章分页
-                    const totalArticlePages = data.total_in_date_range > 0 ? Math.ceil(data.total_in_date_range / ARTICLES_PER_PAGE[sourceKey]) : 0;
-                    renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
+        while (retryCount <= maxRetries && !success) {
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    let apiErrorMsg = `HTTP 错误! 状态: ${response.status}`;
+                    throw new Error(apiErrorMsg);
                 }
-            } else {
-                throw new Error(data.message || 'API 返回错误状态');
+                const data = await response.json();
+                console.log(`收到数据 (${sourceKey}):`, data);
+
+                if (data.status === 'success') {
+                    // 成功获取数据，处理响应
+                    success = true;
+                    
+                    // 根据API端点不同处理不同的返回数据结构
+                    if (USE_TEST_API) {
+                        // 测试API处理逻辑保持不变
+                        const defaultDateRange = {
+                            start: '2025-03-01',
+                            end: '2025-04-01'
+                        };
+                        updateDateInfo(sourceKey, defaultDateRange, 1, 1);
+                        updateDatePaginationButtons(sourceKey, 1, 1);
+                        
+                        // 调用实际的渲染函数
+                        if (sourceKey === 'x') {
+                            renderXArticles(data.data, sourceKey);
+                        } else {
+                            renderCrunchbaseArticles(data.data, sourceKey);
+                        }
+                        
+                        // 渲染文章分页
+                        const totalArticlePages = data.total > 0 ? Math.ceil(data.total / ARTICLES_PER_PAGE[sourceKey]) : 0;
+                        renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
+                    } else {
+                        // 原始API处理逻辑保持不变
+                        updateDateInfo(sourceKey, data.date_range, sourceState.currentDatePage, data.total_date_pages);
+                        updateDatePaginationButtons(sourceKey, sourceState.currentDatePage, data.total_date_pages);
+
+                        // 调用实际的渲染函数
+                        if (sourceKey === 'x') {
+                            renderXArticles(data.data, sourceKey);
+                        } else {
+                            renderCrunchbaseArticles(data.data, sourceKey);
+                        }
+
+                        // 渲染文章分页
+                        const totalArticlePages = data.total_in_date_range > 0 ? Math.ceil(data.total_in_date_range / ARTICLES_PER_PAGE[sourceKey]) : 0;
+                        renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
+                    }
+                } else {
+                    throw new Error(data.message || 'API 返回错误状态');
+                }
+            } catch (error) {
+                console.error(`获取数据错误 (尝试 ${retryCount + 1}/${maxRetries + 1}): ${error.message}`);
+                retryCount++;
+                
+                // 如果达到最大重试次数，显示错误
+                if (retryCount > maxRetries) {
+                    showError(`获取数据失败，请稍后再试或检查API服务状态。Failed to fetch`);
+                    if (errorMessageDiv) errorMessageDiv.style.display = 'block';
+                } else {
+                    // 否则，等待一段时间后重试
+                    await new Promise(resolve => setTimeout(resolve, 800 * retryCount)); // 重试延迟时间递增
+                }
             }
-        } catch (error) {
-            console.error(`获取数据错误: ${error.message}`);
-            showError(`获取数据失败，请稍后再试或检查API服务状态。${error.message}`);
-            errorMessageDiv.style.display = 'block';
-        } finally {
-            hideLoading();
         }
+        
+        hideLoading();
     }
 
     // --- Tab 切换逻辑 --- (无变化)
