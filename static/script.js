@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Constants ---
-    const API_BASE_URL = '/api/articles'; // 改为相对路径，指向 Vercel 上的 API
+    const API_BASE_URL = '/api/articles'; // 使用相对路径，指向 Vercel 上的 API
     const ARTICLES_PER_PAGE = { x: 9, crunchbase: 3 }; // Different sources per page articles
 
     // --- DOM Elements ---
