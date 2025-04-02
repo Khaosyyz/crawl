@@ -207,11 +207,9 @@ main {
 }
 
 .content-collapsible.collapsed {
-    max-height: 100px;
-}
-
-.content-collapsible.collapsed .content-fade {
-    display: block;
+    max-height: 150px;
+    overflow: hidden;
+    position: relative;
 }
 
 .content-fade {
@@ -962,4 +960,189 @@ footer {
     border-radius: 8px;
     font-size: 0.95rem;
     margin: 15px 0;
+}
+
+/* X卡片布局优化 */
+.news-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.news-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.news-stats {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.news-actions {
+    text-align: right;
+    margin-top: 0.5rem;
+}
+
+.view-original-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #f8f9fa;
+    color: #007bff;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.view-original-btn:hover {
+    background-color: #007bff;
+    color: white;
+}
+
+@media (max-width: 576px) {
+    .news-info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .news-meta, .news-stats {
+        width: 100%;
+    }
+}
+
+/* Crunchbase 卡片内容展开/收起样式 */
+.content-fade-button {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,1) 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 10px;
+    color: #007bff;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.content-fade-button:hover {
+    color: #0056b3;
+    background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,1) 100%);
+}
+
+.content-fade-button i {
+    margin-right: 5px;
+}
+
+.content-collapsible:not(.collapsed) .content-fade-button {
+    position: static;
+    background: none;
+    text-align: center;
+    margin-top: 10px;
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.content-collapsible:not(.collapsed) .content-fade-button:hover {
+    background-color: #f8f9fa;
+}
+
+.content-collapsible:not(.collapsed) .content-fade-button i {
+    transform: rotate(180deg);
+}
+
+/* 显示更多/收起按钮样式 */
+.date-group-buttons {
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.show-more-btn, .collapse-btn {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 20px;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.9rem;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.show-more-btn:hover, .collapse-btn:hover {
+    background-color: #e9ecef;
+    color: #212529;
+}
+
+.show-more-btn i, .collapse-btn i {
+    margin-right: 0.5rem;
+}
+
+/* 分页按钮样式优化 */
+.pagination {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+}
+
+.page-btn {
+    min-width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid #dee2e6;
+    background-color: #fff;
+    color: #007bff;
+    font-size: 0.9rem;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+    background-color: #f8f9fa;
+    border-color: #007bff;
+    color: #0056b3;
+}
+
+.page-btn.active {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: #fff;
+    font-weight: 600;
+}
+
+.page-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.page-nav {
+    font-size: 1rem;
+}
+
+.page-ellipsis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.5rem;
+    color: #6c757d;
 }

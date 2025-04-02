@@ -149,16 +149,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>${content}</p>
             </div>
             <div class="news-card-footer">
-                 <div class="news-meta">
-                     <span class="author"><i class="fas fa-user"></i> ${author}</span>
-                     <span class="time"><i class="fas fa-clock"></i> ${timePart}</span>
-                 </div>
-                 <div class="news-stats">
-                     <span title="粉丝数"><i class="fas fa-users"></i> ${formatNumber(article.followers || 0)}</span>
-                     <span title="点赞数"><i class="fas fa-heart"></i> ${formatNumber(article.likes || 0)}</span>
-                     <span title="转发数"><i class="fas fa-retweet"></i> ${formatNumber(article.retweets || 0)}</span>
-                 </div>
-                 <a href="${url}" target="_blank" class="view-original-btn" title="查看原文"><i class="fas fa-external-link-alt"></i></a>
+                <div class="news-info-row">
+                    <div class="news-meta">
+                        <span class="author"><i class="fas fa-user"></i> ${author}</span>
+                        <span class="time"><i class="fas fa-clock"></i> ${timePart}</span>
+                    </div>
+                    <div class="news-stats">
+                        <span title="粉丝数"><i class="fas fa-users"></i> ${formatNumber(article.followers || 0)}</span>
+                        <span title="点赞数"><i class="fas fa-heart"></i> ${formatNumber(article.likes || 0)}</span>
+                        <span title="转发数"><i class="fas fa-retweet"></i> ${formatNumber(article.retweets || 0)}</span>
+                    </div>
+                </div>
+                <div class="news-actions">
+                    <a href="${url}" target="_blank" class="view-original-btn" title="查看原文"><i class="fas fa-external-link-alt"></i></a>
+                </div>
             </div>
         `;
         return card;
@@ -194,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="news-card-content content-collapsible ${isLongContent ? 'collapsed' : ''}">
                 <p>${content}</p>
-                ${isLongContent ? '<div class="content-fade"></div><button class="expand-content-btn"><i class="fas fa-chevron-down"></i> 展开</button>' : ''}
+                ${isLongContent ? '<div class="content-fade-button"><i class="fas fa-chevron-down"></i> 展开</div>' : ''}
             </div>
             <div class="news-card-footer">
                 <div class="investment-details">
@@ -228,11 +232,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log(`准备渲染 ${articles.length} 篇文章`);
 
+        // 按日期分组
         const groupedArticles = groupArticlesByDate(articles);
         const dateKeys = Object.keys(groupedArticles).sort().reverse();
 
         console.log(`按日期分组后有 ${dateKeys.length} 个日期组`);
 
+        // 渲染每个日期组
         dateKeys.forEach(date => {
             const articlesForDate = groupedArticles[date];
             console.log(`日期 ${date} 有 ${articlesForDate.length} 篇文章`);
@@ -361,66 +367,103 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!paginationContainer) return;
         paginationContainer.innerHTML = ''; // 清空旧按钮
         
-            if (totalPages <= 1) {
+        if (totalPages <= 1) {
             paginationContainer.style.display = 'none'; // 如果只有一页或没有页，隐藏分页
-                return;
-            }
+            return;
+        }
+        
         paginationContainer.style.display = 'flex'; // 确保显示
-            
-        const maxPagesToShow = 5; // 最多显示 5 个页码按钮
-            
+        
+        // 首页按钮
+        const firstBtn = document.createElement('button');
+        firstBtn.innerHTML = '&laquo;'; // «
+        firstBtn.title = '首页';
+        firstBtn.disabled = currentPage <= 1;
+        firstBtn.dataset.page = 1;
+        firstBtn.classList.add('page-btn', 'page-nav');
+        paginationContainer.appendChild(firstBtn);
+        
         // 上一页按钮
-            const prevBtn = document.createElement('button');
-        prevBtn.innerHTML = '&laquo;'; // «
+        const prevBtn = document.createElement('button');
+        prevBtn.innerHTML = '&lsaquo;'; // ‹
+        prevBtn.title = '上一页';
         prevBtn.disabled = currentPage <= 1;
         prevBtn.dataset.page = currentPage - 1;
-        prevBtn.classList.add('page-btn', 'prev-next');
+        prevBtn.classList.add('page-btn', 'page-nav');
         paginationContainer.appendChild(prevBtn);
 
-        // 计算页码范围
-        let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
-        let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-        // 如果末尾页数不足 maxPagesToShow，调整 startPage
-        if (endPage - startPage + 1 < maxPagesToShow && startPage > 1) {
-            startPage = Math.max(1, endPage - maxPagesToShow + 1);
+        // 计算要显示的页码范围
+        const maxVisiblePages = 5; // 最多显示5个页码按钮
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
+        // 确保显示足够数量的页码
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
-
-        // 省略号 (如果需要)
+        
+        // 添加 "1..." 如果不从第一页开始
         if (startPage > 1) {
-            const ellipsis = document.createElement('span');
-            ellipsis.textContent = '...';
-            ellipsis.classList.add('page-ellipsis');
-            paginationContainer.appendChild(ellipsis);
+            const firstPageBtn = document.createElement('button');
+            firstPageBtn.textContent = '1';
+            firstPageBtn.dataset.page = 1;
+            firstPageBtn.classList.add('page-btn');
+            paginationContainer.appendChild(firstPageBtn);
+            
+            if (startPage > 2) {
+                const ellipsis = document.createElement('span');
+                ellipsis.textContent = '...';
+                ellipsis.classList.add('page-ellipsis');
+                paginationContainer.appendChild(ellipsis);
+            }
         }
 
         // 页码按钮
-            for (let i = startPage; i <= endPage; i++) {
-                const pageBtn = document.createElement('button');
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
             pageBtn.textContent = i;
             pageBtn.dataset.page = i;
             pageBtn.classList.add('page-btn');
             if (i === currentPage) {
-                    pageBtn.classList.add('active');
+                pageBtn.classList.add('active');
                 pageBtn.disabled = true; // 当前页按钮不可点击
-                }
-                paginationContainer.appendChild(pageBtn);
+            }
+            paginationContainer.appendChild(pageBtn);
+        }
+        
+        // 添加 "...N" 如果不到最后一页
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const ellipsis = document.createElement('span');
+                ellipsis.textContent = '...';
+                ellipsis.classList.add('page-ellipsis');
+                paginationContainer.appendChild(ellipsis);
             }
             
-        // 省略号 (如果需要)
-        if (endPage < totalPages) {
-            const ellipsis = document.createElement('span');
-            ellipsis.textContent = '...';
-            ellipsis.classList.add('page-ellipsis');
-            paginationContainer.appendChild(ellipsis);
+            const lastPageBtn = document.createElement('button');
+            lastPageBtn.textContent = totalPages;
+            lastPageBtn.dataset.page = totalPages;
+            lastPageBtn.classList.add('page-btn');
+            paginationContainer.appendChild(lastPageBtn);
         }
 
         // 下一页按钮
-            const nextBtn = document.createElement('button');
-        nextBtn.innerHTML = '&raquo;'; // »
+        const nextBtn = document.createElement('button');
+        nextBtn.innerHTML = '&rsaquo;'; // ›
+        nextBtn.title = '下一页';
         nextBtn.disabled = currentPage >= totalPages;
         nextBtn.dataset.page = currentPage + 1;
-        nextBtn.classList.add('page-btn', 'prev-next');
-            paginationContainer.appendChild(nextBtn);
+        nextBtn.classList.add('page-btn', 'page-nav');
+        paginationContainer.appendChild(nextBtn);
+        
+        // 末页按钮
+        const lastBtn = document.createElement('button');
+        lastBtn.innerHTML = '&raquo;'; // »
+        lastBtn.title = '末页';
+        lastBtn.disabled = currentPage >= totalPages;
+        lastBtn.dataset.page = totalPages;
+        lastBtn.classList.add('page-btn', 'page-nav');
+        paginationContainer.appendChild(lastBtn);
     }
 
     // --- API 请求函数 (最终) ---
@@ -580,20 +623,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Crunchbase 内容展开/收起监听器 (使用事件委托)
         document.addEventListener('click', (event) => {
-            if (event.target.classList.contains('expand-content-btn') || 
-                (event.target.parentElement && event.target.parentElement.classList.contains('expand-content-btn'))) {
-                const button = event.target.classList.contains('expand-content-btn') ? 
-                    event.target : event.target.parentElement;
-                const contentDiv = button.closest('.content-collapsible');
-                if (contentDiv) {
-                    const isCollapsed = contentDiv.classList.contains('collapsed');
-                    if (isCollapsed) {
-                        contentDiv.classList.remove('collapsed');
-                        button.innerHTML = '<i class="fas fa-chevron-up"></i> 收起';
-                    } else {
-                        contentDiv.classList.add('collapsed');
-                        button.innerHTML = '<i class="fas fa-chevron-down"></i> 展开';
-                    }
+            const target = event.target.closest('.content-fade-button');
+            if (!target) return;
+            
+            const contentDiv = target.closest('.content-collapsible');
+            if (contentDiv) {
+                const isCollapsed = contentDiv.classList.contains('collapsed');
+                if (isCollapsed) {
+                    contentDiv.classList.remove('collapsed');
+                    target.innerHTML = '<i class="fas fa-chevron-up"></i> 收起';
+                } else {
+                    contentDiv.classList.add('collapsed');
+                    target.innerHTML = '<i class="fas fa-chevron-down"></i> 展开';
                 }
             }
         });
