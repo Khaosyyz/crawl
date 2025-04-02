@@ -74,21 +74,21 @@ jsonl_lock = threading.Lock()
 # 常量定义
 API_KEY = 'p9mtsT4ioDYm1'
 API_BASE_URL = 'https://ai.liaobots.work/v1'
-MODEL_NAME = 'gemini-2.5-pro-exp-03-25'  # 改为 gemini-2.5-pro-exp-03-25
+MODEL_NAME = 'deepseek-v3-0324'  # 中文性能更优的模型
 
 # 控制API请求频率的参数
-BATCH_SIZE = 10  # 每批处理的数据量
-BATCH_INTERVAL = 20  # 批处理间隔（秒）
+BATCH_SIZE = 5  # 每批处理的数据量
+BATCH_INTERVAL = 25  # 批处理间隔（秒）
+
+# 临时数据文件路径
+X_TEMP_DATA_PATH = os.path.join(DATA_DIR, 'x_tempdata.json')
+CRU_TEMP_DATA_PATH = os.path.join(DATA_DIR, 'cru_tempdata.json')
 
 # 初始化 OpenAI 客户端
 client = OpenAI(
     api_key=API_KEY,
     base_url=API_BASE_URL
 )
-
-# 临时数据文件路径
-X_TEMP_DATA_PATH = os.path.join(DATA_DIR, 'x_tempdata.json')
-CRU_TEMP_DATA_PATH = os.path.join(DATA_DIR, 'cru_tempdata.json')
 
 # 工具函数
 def generate_id(text: str) -> str:
@@ -102,70 +102,66 @@ class SystemPrompts:
     @staticmethod
     def get_x_prompt() -> str:
         """获取处理X.com数据的系统提示词"""
-        return """你是一位专业的AI行业资讯分析整理师，请将X.com上的推文整理为标准的新闻格式。
+        return """你是一位专业的AI行业资讯整理师，请将X.com上的推文整理为标准的新闻格式。
 
-第一步：必须先将所有内容（无论语言）完整翻译成中文，保持专业性和准确性。
+第一步：必须完整翻译成准确流畅的中文，保持专业术语的准确性。
 
-第二步：判断翻译后的内容是否与AI技术、人工智能应用、机器学习、深度学习、生成式AI、大模型等人工智能相关技术领域相关。只有高度相关的内容才会被处理。
+第二步：严格判断内容是否与AI技术相关。判断标准：
+- 内容必须明确涉及AI技术、大模型、机器学习、深度学习等人工智能核心技术
+- 或讨论AI应用、产品发布、研究进展、商业动态
+- 或分析AI行业趋势、伦理问题、监管政策等
+- 拒绝仅因包含"智能"、"算法"等宽泛词汇而非真正AI相关的内容
+- 拒绝表情符号过多、内容质量低的无价值信息
 
-第三步：如果内容与AI相关，请按以下格式返回清洗后的内容：
+第三步：如果内容确实与AI相关，按以下格式返回：
 
-标题: [根据翻译后的内容自拟新闻标题，确保简洁明了(25字以内)且包含关键信息，突出公司名称、技术名称或产品名称，避免使用"关于"、"如何"等模糊词语]
-正文: [翻译后的内容，整理为清晰简洁的行业新闻格式，分段合理，删除冗余信息。如原始内容中包含URL链接，根据链接内容和上下文，使用合适的描述，例如"——报告链接：@URL"、"——图片来源：@URL"、"——视频来源：@URL"、"——资讯来源：@URL"、"——白皮书链接：@URL"等，放在相关段落后]
+标题: [25字以内的专业新闻标题，简洁并富有吸引力]
+正文: [组织为清晰的中文新闻报道，分段合理，保留专业术语，删除冗余信息。将URL链接替换为适当描述，如"——报告链接：@URL"等]
 作者: [原作者名] (@[用户名])
-粉丝数: [粉丝数值]
-点赞数: [点赞数值]
-转发数: [转发数值]
-日期: [原文发布日期，格式为YYYY-MM-DD HH:MM]
+粉丝数: [数值]
+点赞数: [数值]
+转发数: [数值]
+日期: [YYYY-MM-DD HH:MM格式]
 
 处理要求：
-1. 无论内容多少，必须先完整翻译成中文再进行判断和处理
-2. 必须严格按照以上字段顺序和格式返回
-3. 标题必须自拟新闻标题，25字以内，简洁有力，突出技术产品或公司名称
-4. 正文必须是翻译后的中文内容，以专业新闻的语气呈现，保持原文的信息完整性
-5. 保留专有名词的中文翻译，重要的技术词汇保留英文原文标注，如"大型语言模型(Large Language Model, LLM)"
-6. 英文和数字前后需加空格提高可读性
-7. 对原文中的URL链接，根据上下文判断链接类型，选择合适的描述文本（如报告链接、图片来源、视频链接、资讯来源、白皮书等），使用"——[适当描述]：@URL"的格式展示
-8. 所有返回必须是结构化的字段，便于JSON解析
-9. 如果翻译后判断内容与AI无关，则不返回任何内容
-10. 不在返回内容中添加额外说明或注释
-11. 所有内容必须有明确边界，每个字段单独成行
-12. 注意截断太长的内容，但必须保持句子和段落的完整性"""
+1. 对非AI相关内容，不返回任何结构化字段
+2. 精心编写标题，25字以内，专业准确，避免"相关"、"关于"等模糊用词
+3. 正文保持信息完整性和专业性，确保段落和句子逻辑清晰
+4. 对AI专业词汇，保留原文术语如"GPT-4"，并提供适当中文说明
+5. 不要生成含有大量表情符号的内容
+6. 不要在回复中添加额外解释或元信息"""
     
     @staticmethod
     def get_crunchbase_prompt() -> str:
         """获取处理Crunchbase数据的系统提示词"""
-        return """你是一位专业的AI行业投资信息分析整理师，请将Crunchbase融资或投资文章处理为标准的新闻格式。
+        return """你是一位专业的AI行业投资信息整理师，请将Crunchbase融资或投资文章处理为标准的新闻格式。
 
-第一步：必须先将所有内容（无论语言）完整翻译成中文，保持专业性和准确性。
+第一步：将内容完整翻译成准确专业的中文。
 
-第二步：判断翻译后的内容是否与AI技术、人工智能公司、机器学习应用等相关。只有高度相关的内容才会被处理。
+第二步：严格判断内容是否与AI行业投资相关。判断标准：
+- 必须涉及AI技术公司、AI产品或服务的融资、收购或投资活动
+- 或AI相关技术创业、风险投资、市场拓展等商业活动
+- 拒绝与人工智能无明显关联的一般科技投融资新闻
+- 拒绝表情符号过多、内容质量低的无价值信息
 
-第三步：请按以下格式返回清洗后的内容：
+第三步：如果确定是AI相关投资内容，按以下格式返回：
 
-标题: [格式为"公司名+融资金额+轮次"，例如"AI初创公司XXX完成1000万美元A轮融资"，确保简洁明了且符合新闻标题规范]
-正文: [翻译后的内容，整理为多段式新闻正文，第一段概述融资情况，后续段落介绍公司背景、技术、产品及用途，最后段落可提及投资方信息。确保段落分明，语句通顺，可读性高。如原始内容中包含URL链接，根据链接内容和上下文，选择合适的描述文本，例如"——公司官网：@URL"、"——融资公告：@URL"、"——产品介绍：@URL"等，放在相关段落后]
+标题: ["公司名+融资金额+轮次"格式，25字以内，准确专业]
+正文: [组织为专业投资新闻报道，3-5段结构，首段概述融资情况，后续介绍公司、技术和产品，最后提及投资方信息]
 作者: [原作者姓名，若无则填"未提供"]
-公司: [相关公司名称，必须准确提取]
-融资轮次: [轮次信息，如种子轮、A轮等，必须准确提取]
-融资金额: [融资金额，必须准确提取，包含货币单位]
-投资方: [投资机构或个人名称列表，必须准确提取]
-日期: [原文发布日期，格式为YYYY-MM-DD]
+公司: [相关公司名称]
+融资轮次: [种子轮/A轮等具体轮次]
+融资金额: [包含货币单位的金额]
+投资方: [投资机构或个人名称]
+日期: [YYYY-MM-DD格式]
 
 处理要求：
-1. 无论内容多少，必须先完整翻译成中文再进行判断和处理
-2. 必须严格按照以上字段顺序和格式返回
-3. 标题必须按照"公司名+融资金额+轮次"模式，25字以内，具有新闻价值
-4. 正文必须采用专业新闻报道格式，分成3-5个段落，每段不超过3-4个句子
-5. 重要的公司名称、产品名称等专有名词需保留英文原文标注，如"人工智能公司DeepMind"
-6. 英文和数字前后需加空格提高可读性
-7. 对原文中的URL链接，根据上下文判断链接类型，选择合适的描述文本（如公司官网、融资公告、产品介绍等），使用"——[适当描述]：@URL"的格式展示
-8. 务必准确提取融资轮次、融资金额和投资方信息，这些是关键数据
-9. 所有返回必须是结构化的字段，便于JSON解析
-10. 如果翻译后判断内容与AI行业投资无关，则不返回任何内容
-11. 不在返回内容中添加额外说明或注释
-12. 如原文确实没有提供某字段信息，请使用'未提供'填充
-13. 所有内容必须有明确边界，每个字段单独成行"""
+1. 对非AI相关投资内容，不返回任何结构化字段
+2. 精心编写标题，确保格式统一且专业
+3. 正文内容必须分段清晰，每段逻辑完整，总体结构合理
+4. 务必准确提取融资金额、轮次和投资方信息
+5. 保留重要专有名词的原文表示，如"OpenAI"
+6. 不要在回复中添加额外解释或元信息"""
     
     @staticmethod
     def get_default_prompt() -> str:
@@ -188,7 +184,6 @@ class SystemPrompts:
             return SystemPrompts.get_default_prompt()
 
 
-# 工具函数
 class TextUtils:
     """文本处理工具类"""
     
@@ -198,38 +193,54 @@ class TextUtils:
         if not content:
             return ""
         
-        # 保留内容中的换行符，只移除末尾的标点符号和空格
-        cleaned = re.sub(r'[.,，、;；:：!！?？\s]+$', '', content)
+        # 处理段落间的空行，确保段落有统一的间距
+        content = re.sub(r'\n{3,}', '\n\n', content)
         
-        # 确保内容不为空
-        if not cleaned.strip():
-            return ""
+        # 修复中文标点使用错误，例如逗号后缺少空格
+        content = re.sub(r'([，。！？；：])([^\s])', r'\1 \2', content)
         
-        # 添加句号结尾
-        cleaned = cleaned.strip() + '。'
-        
-        # 修复可能的重复句号
-        cleaned = re.sub(r'。+$', '。', cleaned)
-        
-        return cleaned
+        # 确保内容以句号结尾
+        content = content.rstrip()
+        if content and not content[-1] in '。！？.!?':
+            content += '。'
+            
+        return content
     
     @staticmethod
     def format_crunchbase_content(content: str) -> str:
-        """特殊格式化Crunchbase内容，增强段落可读性"""
+        """格式化Crunchbase内容，为具体链接添加标签等处理"""
         if not content:
             return ""
+            
+        # 处理链接格式，规范为统一形式
+        content = re.sub(r'(https?://\S+)', r'[链接地址: \1]', content)
+            
+        # 分段处理，确保每段不超过300字符
+        paragraphs = content.split('\n\n')
+        formatted_paragraphs = []
         
-        # 将小数点前标记为特殊字符，避免小数点被当作句号处理
-        # 先保护小数点格式 (前后都是数字的点)
-        content = re.sub(r'(\d)\.(\d)', r'\1##DOT##\2', content)
-        
-        # 确保段落之间有足够的换行符（对真正的句末标点）
-        content = re.sub(r'([。！？!?])\s*(?=\S)', r'\1\n\n', content)
-        
-        # 恢复小数点
-        content = content.replace('##DOT##', '.')
-        
-        return content
+        for p in paragraphs:
+            if len(p) > 300:
+                # 尝试在句子边界分段
+                sentences = re.split(r'(?<=[。！？.!?])\s*', p)
+                current_para = ""
+                
+                for s in sentences:
+                    if not s.strip():
+                        continue
+                    if len(current_para) + len(s) > 300:
+                        if current_para:
+                            formatted_paragraphs.append(current_para)
+                        current_para = s
+                    else:
+                        current_para += (" " if current_para else "") + s
+                
+                if current_para:
+                    formatted_paragraphs.append(current_para)
+            else:
+                formatted_paragraphs.append(p)
+                
+        return "\n\n".join(formatted_paragraphs)
 
 
 class DataProcessor:
@@ -414,7 +425,7 @@ class XDataProcessor(DataProcessor):
                 if not line:
                     continue
                 
-                if ':' in line and not line.startswith('http') and not line.startswith('——报告链接：@http'):
+                if ':' in line and not line.startswith('http') and not line.startswith('——'):
                     # 如果有新字段开始，先保存之前收集的正文内容
                     if current_field == 'content' and content_lines:
                         parsed['content'] = '\n'.join(content_lines)
@@ -462,36 +473,12 @@ class XDataProcessor(DataProcessor):
             if current_field == 'content' and content_lines:
                 parsed['content'] = '\n'.join(content_lines)
             
-            # 验证必要字段 - 如果缺少标题，则使用原始文本生成一个
-            if 'title' not in parsed or not parsed['title']:
-                logger.info("解析结果缺少标题字段，尝试生成标题")
-                # 使用原始文本的开头作为标题（最多50个字符）
-                raw_text = original_item.get('text', '').strip()
-                if raw_text:
-                    # 取前50个字符，确保不截断单词
-                    if len(raw_text) > 50:
-                        title_text = raw_text[:50].rsplit(' ', 1)[0] + '...'
-                    else:
-                        title_text = raw_text
-                    parsed['title'] = f"AI相关：{title_text}"
-                else:
-                    # 如果原始文本为空，使用通用标题
-                    parsed['title'] = "AI行业动态"
-                
-                logger.info(f"自动生成标题: {parsed['title']}")
+            # 验证必要字段 - 如果缺少标题或内容，则返回None
+            if not parsed.get('title') or not parsed.get('content'):
+                logger.warning("解析结果缺少标题或正文字段，跳过处理")
+                return None
             
-            # 如果内容为空，尝试使用原始文本
-            if 'content' not in parsed or not parsed['content']:
-                logger.warning("解析结果缺少正文字段，使用原始文本")
-                raw_text = original_item.get('text', '')
-                if raw_text:
-                    parsed['content'] = TextUtils.standardize_punctuation(raw_text)
-                else:
-                    # 如果真的没有内容，跳过
-                    logger.warning("无法获取内容，跳过处理")
-                    return None
-            
-            # 使用原始数据中的作者信息
+            # 准备作者信息
             author_name = original_item.get('raw', {}).get('name', '')
             author_username = original_item.get('raw', {}).get('username', '')
             author_display = f"{author_name} (@{author_username})" if author_name and author_username else author_name or author_username
@@ -633,7 +620,7 @@ class CrunchbaseDataProcessor(DataProcessor):
                 if not line:
                     continue
                 
-                if ':' in line and not line.startswith('http') and not line.startswith('——报告链接：@http'):
+                if ':' in line and not line.startswith('http') and not line.startswith('——'):
                     # 如果有新字段开始，先保存之前收集的正文内容
                     if current_field == 'content' and content_lines:
                         parsed['content'] = '\n'.join(content_lines)
@@ -678,40 +665,10 @@ class CrunchbaseDataProcessor(DataProcessor):
             if current_field == 'content' and content_lines:
                 parsed['content'] = '\n'.join(content_lines)
             
-            # 验证必要字段 - 如果缺少标题，则尝试从原始数据生成
-            if 'title' not in parsed or not parsed['title']:
-                logger.info("解析结果缺少标题字段，尝试生成标题")
-                # 首先尝试使用原始文章标题
-                if original_item.get('title'):
-                    parsed['title'] = original_item.get('title')
-                # 否则使用原始文本的开头
-                else:
-                    raw_text = original_item.get('content', '').strip()
-                    if raw_text:
-                        # 取前50个字符，确保不截断单词
-                        if len(raw_text) > 50:
-                            title_text = raw_text[:50].rsplit(' ', 1)[0] + '...'
-                        else:
-                            title_text = raw_text
-                        parsed['title'] = f"投融资：{title_text}"
-                    else:
-                        # 如果原始文本为空，使用通用标题
-                        parsed['title'] = "Crunchbase投融资资讯"
-                
-                logger.info(f"自动生成标题: {parsed['title']}")
-            
-            # 如果内容为空，尝试使用原始文本
-            if 'content' not in parsed or not parsed['content']:
-                logger.warning("解析结果缺少正文字段，使用原始文本")
-                raw_text = original_item.get('content', '')
-                if raw_text:
-                    # 为原始内容应用特殊格式化
-                    parsed['content'] = TextUtils.format_crunchbase_content(raw_text)
-                    parsed['content'] = TextUtils.standardize_punctuation(parsed['content'])
-                else:
-                    # 如果真的没有内容，跳过
-                    logger.warning("无法获取内容，跳过处理")
-                    return None
+            # 验证必要字段 - 如果缺少标题或内容，则返回None
+            if not parsed.get('title') or not parsed.get('content'):
+                logger.warning("解析结果缺少标题或正文字段，跳过处理")
+                return None
             
             # 构建最终结构化数据
             structured_data = {
