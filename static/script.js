@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<p class="no-articles">当前日期范围内没有找到资讯。</p>';
             return;
         }
-        
+
         console.log(`准备渲染 ${articles.length} 篇文章`);
 
         // 按日期分组
@@ -394,9 +394,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
             if (totalPages <= 1) {
             paginationContainer.style.display = 'none'; // 如果只有一页或没有页，隐藏分页
-                return;
-            }
-            
+                        return;
+                    }
+                    
         paginationContainer.style.display = 'flex'; // 确保显示
         
         // 首页按钮
@@ -545,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             // 渲染文章分页
                             const totalArticlePages = cachedData.total > 0 ? Math.ceil(cachedData.total / ARTICLES_PER_PAGE[sourceKey]) : 0;
                             renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
-                        } else {
+                } else {
                             // 原始API处理逻辑
                             updateDateInfo(sourceKey, cachedData.date_range, sourceState.currentDatePage, cachedData.total_date_pages);
                             updateDatePaginationButtons(sourceKey, sourceState.currentDatePage, cachedData.total_date_pages);
@@ -565,8 +565,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         hideLoading();
                         return; // 使用缓存数据后直接返回
                     }
-                }
-            } catch (error) {
+                    }
+                } catch (error) {
                 console.error('读取缓存失败:', error);
                 // 缓存读取失败，继续使用API获取数据
             }
@@ -616,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 调用实际的渲染函数
                         if (sourceKey === 'x') {
                             renderXArticles(data.data, sourceKey);
-                        } else {
+            } else {
                             renderCrunchbaseArticles(data.data, sourceKey);
                         }
                         
@@ -650,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (retryCount > maxRetries) {
                     showError(`获取数据失败，请稍后再试或检查API服务状态。Failed to fetch`);
                     if (errorMessageDiv) errorMessageDiv.style.display = 'block';
-                } else {
+            } else {
                     // 否则，等待一段时间后重试
                     await new Promise(resolve => setTimeout(resolve, 800 * retryCount)); // 重试延迟时间递增
                 }
@@ -682,7 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 添加活动类到当前标签链接
         if (event) {
             event.currentTarget.classList.add('active');
-                } else {
+            } else {
             // 初始化调用时没有事件对象
             const linkForContent = document.querySelector(`[onclick*="${contentId}"]`);
             if (linkForContent) linkForContent.classList.add('active');
@@ -978,7 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         store.put(cacheItem);
                     }
                 };
-            } catch (error) {
+        } catch (error) {
                 console.error('更新缓存访问时间戳失败:', error);
             }
         }
@@ -1075,41 +1075,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 创建全局缓存管理器实例
     const cacheManager = new CacheManager();
-
-    // 添加缓存控制按钮
-    const controlsContainer = document.createElement('div');
-    controlsContainer.className = 'cache-controls';
-    controlsContainer.style.position = 'fixed';
-    controlsContainer.style.bottom = '10px';
-    controlsContainer.style.right = '10px';
-    controlsContainer.style.zIndex = '1000';
-    
-    const clearCacheBtn = document.createElement('button');
-    clearCacheBtn.textContent = '清除缓存';
-    clearCacheBtn.className = 'clear-cache-btn';
-    clearCacheBtn.style.padding = '5px 10px';
-    clearCacheBtn.style.backgroundColor = '#f44336';
-    clearCacheBtn.style.color = 'white';
-    clearCacheBtn.style.border = 'none';
-    clearCacheBtn.style.borderRadius = '4px';
-    clearCacheBtn.style.cursor = 'pointer';
-    
-    clearCacheBtn.addEventListener('click', async () => {
-        try {
-            await cacheManager.clearAllCache();
-            alert('缓存已清除!');
-            // 刷新当前标签数据
-            if (state.activeSource) {
-                fetchArticles(state.activeSource);
-            }
-        } catch (error) {
-            console.error('清除缓存失败:', error);
-            alert('清除缓存失败: ' + error.message);
-        }
-    });
-    
-    controlsContainer.appendChild(clearCacheBtn);
-    document.body.appendChild(controlsContainer);
 });
 
 // GSAP 动画 (无变化)
