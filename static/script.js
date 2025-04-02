@@ -496,12 +496,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Tab 切换逻辑 --- (无变化)
-    window.openSource = function(event, contentId) { /* ... */ }
+    window.openSource = function(event, contentId) {
+        // 阻止默认事件
+        if (event) event.preventDefault();
+        
+        // 隐藏所有标签内容
+        tabContents.forEach(content => {
+            content.style.display = 'none';
+        });
+        
+        // 移除所有标签链接的活动类
+        tabLinks.forEach(link => {
+            link.classList.remove('active');
+        });
+        
+        // 显示当前标签内容
+        const activeContent = document.getElementById(contentId);
+        if (activeContent) activeContent.style.display = 'block';
+        
+        // 添加活动类到当前标签链接
+        if (event) {
+            event.currentTarget.classList.add('active');
+        } else {
+            // 初始化调用时没有事件对象
+            const linkForContent = document.querySelector(`[onclick*="${contentId}"]`);
+            if (linkForContent) linkForContent.classList.add('active');
+        }
+        
+        // 更新当前活动源
+        state.activeSource = contentId.split('-')[0]; // 'x-content' -> 'x'
+        
+        // 加载对应数据
+        fetchArticles(state.activeSource);
+    }
 
     // --- 事件监听器设置 ---
     function setupEventListeners() {
-        // 日期分页监听器 (无变化)
-        ['x', 'crunchbase'].forEach(sourceKey => { /* ... */ });
+        // 日期分页监听器
+        ['x', 'crunchbase'].forEach(sourceKey => {
+            const prevDateBtn = elements[sourceKey].prevDateBtn;
+            const nextDateBtn = elements[sourceKey].nextDateBtn;
+            
+            if (prevDateBtn) {
+                prevDateBtn.addEventListener('click', () => {
+                    if (!prevDateBtn.disabled) {
+                        state[sourceKey].currentDatePage--;
+                        state[sourceKey].currentPage = 1; // 重置文章页码
+                        fetchArticles(sourceKey);
+                    }
+                });
+            }
+            
+            if (nextDateBtn) {
+                nextDateBtn.addEventListener('click', () => {
+                    if (!nextDateBtn.disabled) {
+                        state[sourceKey].currentDatePage++;
+                        state[sourceKey].currentPage = 1; // 重置文章页码
+                        fetchArticles(sourceKey);
+                    }
+                });
+            }
+        });
 
         // 文章分页监听器 (使用事件委托)
         ['x', 'crunchbase'].forEach(sourceKey => {
@@ -525,8 +580,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Crunchbase 内容展开/收起监听器 (使用事件委托)
         document.addEventListener('click', (event) => {
-            if (event.target.classList.contains('expand-content-btn')) {
-                const button = event.target;
+            if (event.target.classList.contains('expand-content-btn') || 
+                (event.target.parentElement && event.target.parentElement.classList.contains('expand-content-btn'))) {
+                const button = event.target.classList.contains('expand-content-btn') ? 
+                    event.target : event.target.parentElement;
                 const contentDiv = button.closest('.content-collapsible');
                 if (contentDiv) {
                     const isCollapsed = contentDiv.classList.contains('collapsed');
@@ -536,8 +593,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         contentDiv.classList.add('collapsed');
                         button.innerHTML = '<i class="fas fa-chevron-down"></i> 展开';
-                        // 可选：点击收起时滚动回卡片顶部
-                        // contentDiv.closest('.news-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
                 }
             }
@@ -586,8 +641,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 extraCardsContainer.style.display = 'none';
                 showMoreBtn.style.display = 'inline-flex'; // Or block
                 collapseBtn.style.display = 'none';
-                // 可选: 滚动到该组的开头
-                // buttonContainer.previousElementSibling.previousElementSibling.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         });
     }
