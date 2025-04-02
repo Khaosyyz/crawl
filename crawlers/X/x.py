@@ -1130,7 +1130,7 @@ class XCrawler:
         # 访问搜索页面
         try:
             print("开始爬取推文...")
-            url = "https://x.com/search?q=AI&src=typed_query&f=live"
+            url = "https://x.com/search?q=AI&src=typed_query"
             print(f"访问搜索页面: {url}")
             self.driver.get(url)
             time.sleep(7)  # 增加初始页面加载等待时间

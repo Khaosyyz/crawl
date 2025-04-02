@@ -28,32 +28,44 @@ class MongoJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 # 设置日志记录
+# 注意：在 Vercel Serverless 环境中，写入文件系统可能受限或非持久化
+# 仅使用 StreamHandler 以避免文件系统权限问题
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(project_root, "logs", "api.log")),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("api")
 
 app = Flask(__name__)
 # 配置 CORS，允许所有域名访问
 CORS(app) # 简化配置，允许所有来源，如果需要更严格控制，可以配置 origins
-# app.json_encoder = MongoJSONEncoder # 移除，因为 db/mongodb.py 中 _serialize_docs 已处理序列化
 
 # 禁用Flask默认日志
 app.logger.disabled = True
 log = logging.getLogger('werkzeug')
 log.disabled = True
 
-# 初始化MongoDB连接 (应该在应用上下文中处理更好，但暂时保持)
-db = MongoDB()
+# 初始化MongoDB连接 (包装在 try-except 中)
+try:
+    db = MongoDB()
+    logger.info("MongoDB 连接初始化成功")
+except Exception as e:
+    logger.error(f"初始化 MongoDB 连接失败: {e}")
+    logger.error(traceback.format_exc())
+    db = None  # 设置为 None，以便后续检查
 
 @app.route('/api/articles')
 def get_articles():
     """API端点：获取文章列表，支持来源过滤、分页和日期分页"""
+    # 检查数据库连接状态
+    if db is None:
+        logger.error("数据库连接不可用，无法获取文章")
+        return jsonify({
+            'status': 'error',
+            'message': '数据库连接失败，请稍后重试'
+        }), 500
+        
     try:
         # 获取分页参数
         page = int(request.args.get('page', 1))
@@ -66,11 +78,10 @@ def get_articles():
         # 构建基础查询条件
         base_query = {'source': source}
 
-        # 获取总文章数 (基于来源)
-        # total_source_articles = db.get_article_count(base_query) # 获取总数逻辑移到后面，基于日期范围
-
         # --- 合并 api/articles.py 的日期范围逻辑 ---
         reference_date = None
+        tz_shanghai = pytz.timezone('Asia/Shanghai')
+        
         try:
             # 获取最新文章以确定参考日期
             newest_article = db.get_articles(
@@ -78,25 +89,49 @@ def get_articles():
                 limit=1,
                 sort=[('date_time', -1)]
             )
+            
             if newest_article and newest_article[0].get('date_time'):
-                # db.get_articles 返回的是已序列化的 dict，date_time 是字符串
                 try:
-                    # 注意：MongoDB 返回的可能是 ISO 格式或其他，确保解析正确
-                    # 假设 db 层返回的是 '%Y-%m-%d %H:%M:%S' 格式字符串
-                    reference_date = datetime.datetime.fromisoformat(newest_article[0]['date_time'].replace('Z', '+00:00')) if isinstance(newest_article[0]['date_time'], str) else newest_article[0]['date_time']
-                    # 转换到上海时区以便计算 Delta (如果需要的话，但计算差值不需要)
-                    reference_date = reference_date.astimezone(pytz.timezone('Asia/Shanghai'))
-                    logger.info(f"使用数据库中最新文章日期作为参考: {reference_date}")
-                except ValueError:
-                     # 如果格式不是 ISO 或 '%Y-%m-%d %H:%M:%S'，尝试其他格式或记录错误
-                    logger.error(f"无法解析数据库中的日期格式: {newest_article[0]['date_time']}，使用当前时间。")
-                    reference_date = datetime.datetime.now(pytz.timezone('Asia/Shanghai'))
-
+                    # 处理不同类型的日期值
+                    dt_obj = newest_article[0]['date_time']
+                    
+                    if isinstance(dt_obj, str):
+                        # 尝试解析 ISO 格式字符串，处理 'Z'
+                        dt_obj = dt_obj.replace('Z', '+00:00')
+                        if 'T' in dt_obj:  # ISO 格式
+                            dt_obj = datetime.datetime.fromisoformat(dt_obj)
+                        else:  # 可能是自定义格式
+                            try:
+                                dt_obj = datetime.datetime.strptime(dt_obj, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                logger.error(f"无法解析日期字符串: {dt_obj}，尝试其他格式")
+                                # 尝试其他常见格式
+                                formats = ['%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%d/%m/%Y']
+                                for fmt in formats:
+                                    try:
+                                        dt_obj = datetime.datetime.strptime(dt_obj, fmt)
+                                        break
+                                    except ValueError:
+                                        continue
+                    
+                    if isinstance(dt_obj, datetime.datetime):
+                        # 确保时区感知
+                        if dt_obj.tzinfo is None or dt_obj.tzinfo.utcoffset(dt_obj) is None:
+                            dt_obj = pytz.utc.localize(dt_obj)  # 假设是 UTC
+                        reference_date = dt_obj.astimezone(tz_shanghai)
+                        logger.info(f"使用数据库中最新文章日期作为参考: {reference_date}")
+                    else:
+                        logger.error(f"数据库返回的日期类型未知: {type(dt_obj)}，使用当前时间")
+                        reference_date = datetime.datetime.now(tz_shanghai)
+                        
+                except Exception as date_parse_e:
+                    logger.error(f"解析最新文章日期时发生错误: {date_parse_e}，使用当前时间")
+                    reference_date = datetime.datetime.now(tz_shanghai)
         except Exception as e:
-            logger.error(f"获取最新文章日期失败: {e}, 使用当前时间。")
+            logger.error(f"获取最新文章日期失败: {e}，使用当前时间")
 
         if reference_date is None:
-            reference_date = datetime.datetime.now(pytz.timezone('Asia/Shanghai'))
+            reference_date = datetime.datetime.now(tz_shanghai)
             logger.info(f"未能确定参考日期，使用当前系统时间: {reference_date}")
 
         # 日期分页处理 (每页 2 天)
@@ -104,17 +139,12 @@ def get_articles():
         end_days_ago = start_days_ago + 2
 
         # 计算日期范围 - 使用参考日期
-        # 确保时区感知，以便比较
-        tz_shanghai = pytz.timezone('Asia/Shanghai')
         start_date = (reference_date - datetime.timedelta(days=end_days_ago)).replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = (reference_date - datetime.timedelta(days=start_days_ago)).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        # 转换为 MongoDB 查询兼容的格式 (字符串)
-        start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
-        end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
-
-        # 日期查询范围
-        date_query = {'date_time': {'$gte': start_date_str, '$lte': end_date_str}}
+        # MongoDB 查询使用 datetime 对象更可靠
+        date_query = {'date_time': {'$gte': start_date, '$lte': end_date}}
+        logger.info(f"查询日期范围: {start_date.isoformat()} 到 {end_date.isoformat()}")
 
         # 合并查询条件
         query = {**base_query, **date_query}
@@ -125,7 +155,7 @@ def get_articles():
 
         # 获取当前日期范围和页面的文章总数 (用于分页)
         total_in_date_range = db.get_article_count(query)
-        logger.info(f"查询条件 {query} 下找到的文章总数: {total_in_date_range}")
+        logger.info(f"查询条件下找到的文章总数: {total_in_date_range}")
 
         # 获取分页数据
         articles = db.get_articles(
@@ -146,28 +176,50 @@ def get_articles():
             )
             if oldest_article and oldest_article[0].get('date_time'):
                 try:
-                    # 同样注意日期格式解析
-                    oldest_date = datetime.datetime.fromisoformat(oldest_article[0]['date_time'].replace('Z', '+00:00')) if isinstance(oldest_article[0]['date_time'], str) else oldest_article[0]['date_time']
-                    oldest_date = oldest_date.astimezone(pytz.timezone('Asia/Shanghai'))
-                    # 使用最新的 reference_date 来计算差异
-                    days_diff = (reference_date.date() - oldest_date.date()).days # 只比较日期部分
-                    total_date_pages = (days_diff // 2) + 1 # 每页2天
-                except ValueError:
-                    logger.error(f"无法解析最早文章日期格式: {oldest_article[0]['date_time']}")
+                    # 处理不同类型的日期值
+                    oldest_dt_obj = oldest_article[0]['date_time']
+                    
+                    if isinstance(oldest_dt_obj, str):
+                        oldest_dt_obj = oldest_dt_obj.replace('Z', '+00:00')
+                        if 'T' in oldest_dt_obj:  # ISO 格式
+                            oldest_dt_obj = datetime.datetime.fromisoformat(oldest_dt_obj)
+                        else:  # 可能是自定义格式
+                            try:
+                                oldest_dt_obj = datetime.datetime.strptime(oldest_dt_obj, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                # 尝试其他常见格式
+                                formats = ['%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%d/%m/%Y']
+                                for fmt in formats:
+                                    try:
+                                        oldest_dt_obj = datetime.datetime.strptime(oldest_dt_obj, fmt)
+                                        break
+                                    except ValueError:
+                                        continue
+                    
+                    if isinstance(oldest_dt_obj, datetime.datetime):
+                        if oldest_dt_obj.tzinfo is None or oldest_dt_obj.tzinfo.utcoffset(oldest_dt_obj) is None:
+                            oldest_dt_obj = pytz.utc.localize(oldest_dt_obj)
+                        oldest_date_sh = oldest_dt_obj.astimezone(tz_shanghai)
+                        
+                        # 使用最新的 reference_date 来计算差异 (确保都是 date 对象)
+                        days_diff = (reference_date.date() - oldest_date_sh.date()).days
+                        total_date_pages = max(1, (days_diff // 2) + 1) # 每页2天, 至少1页
+                        logger.info(f"最早文章日期: {oldest_date_sh}, 天数差: {days_diff}, 总日期页数: {total_date_pages}")
+                except Exception as e:
+                    logger.error(f"解析最早文章日期时发生错误: {e}")
         except Exception as e:
             logger.error(f"获取最早文章日期失败: {e}")
         # --- 日期分页总数逻辑结束 ---
 
         response_data = {
             'status': 'success',
-            # 'total': total_source_articles, # 这个 total 意义不大，用下面的代替
-            'total_in_date_range': total_in_date_range, # 当前日期范围内的总数
+            'total_in_date_range': total_in_date_range,
             'page': page,
             'date_page': date_page,
-            'total_date_pages': total_date_pages, # 估算的日期总页数
-            'per_page': items_per_page, # 当前来源每页数量
+            'total_date_pages': total_date_pages,
+            'per_page': items_per_page,
             'source': source,
-            'date_range': { # 当前查询的日期范围
+            'date_range': {
                 'start': start_date.strftime('%Y-%m-%d'),
                 'end': end_date.strftime('%Y-%m-%d')
             },
@@ -177,13 +229,9 @@ def get_articles():
         # 检查是否是 JSONP 请求 (保持兼容性)
         callback = request.args.get('callback')
         if callback:
-            # 注意：json.dumps 需要能处理 MongoDB ObjectId 等类型
-            # 之前依赖 app.json_encoder，现在 db 层处理了序列化，直接 dumps 即可
             jsonp_response = f"{callback}({json.dumps(response_data)})"
             return Response(jsonp_response, mimetype='application/javascript')
 
-        logger.debug(f"响应数据: {response_data}")
-        # 直接使用 jsonify，它能正确处理 dict
         return jsonify(response_data)
 
     except Exception as e:
@@ -207,6 +255,13 @@ def get_articles():
 @app.route('/api/articles/<article_id>')
 def get_article(article_id):
     """API端点：获取单篇文章详情"""
+    if db is None:
+        logger.error("数据库连接不可用，无法获取文章详情")
+        return jsonify({
+            'status': 'error',
+            'message': '数据库连接失败，请稍后重试'
+        }), 500
+        
     try:
         article = db.get_article_by_id(article_id)
         if not article:
@@ -220,7 +275,7 @@ def get_article(article_id):
             'data': article
         })
     except Exception as e:
-        logger.error(f"获取文章详情出错: {e}")
+        logger.error(f"获取文章详情出错 (ID: {article_id}): {e}")
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return jsonify({
             'status': 'error',
@@ -231,9 +286,16 @@ def get_article(article_id):
 @app.route('/api/search')
 def search_articles():
     """API端点：全文搜索文章"""
+    if db is None:
+        logger.error("数据库连接不可用，无法执行搜索")
+        return jsonify({
+            'status': 'error',
+            'message': '数据库连接失败，请稍后重试'
+        }), 500
+        
     try:
-        query = request.args.get('q', '')
-        if not query:
+        query_term = request.args.get('q', '') # 使用 query_term 避免与 MongoDB 查询变量混淆
+        if not query_term:
             return jsonify({
                 'status': 'error',
                 'message': '请提供搜索关键词'
@@ -247,29 +309,29 @@ def search_articles():
         
         # 构建搜索条件
         search_criteria = {}
-        
-        # 如果指定了数据源，添加到搜索条件中
         if source:
             search_criteria['source'] = source
-        
-        # 执行全文搜索
-        results = db.search_articles(
-            query=query,
-            search_criteria=search_criteria,
-            skip=(page - 1) * per_page,
-            limit=per_page
+
+        logger.info(f"搜索关键词: '{query_term}', 来源: {source}, 页面: {page}, 每页: {per_page}")
+            
+        # 调用 db 层的搜索方法
+        results, total_results = db.search_articles(
+            query_term=query_term,
+            query_filter=search_criteria, # 传递过滤条件
+            page=page,
+            per_page=per_page
         )
-        
-        # 获取总数
-        total = len(results)
         
         return jsonify({
             'status': 'success',
-            'total': total,
+            'query': query_term,
+            'total': total_results,
             'page': page,
             'per_page': per_page,
-            'data': results
+            'source_filter': source, # 返回当前使用的来源过滤器
+            'data': results # db 层应处理序列化
         })
+        
     except Exception as e:
         logger.error(f"搜索文章出错: {e}")
         logger.error(f"错误堆栈: {traceback.format_exc()}")
@@ -281,7 +343,14 @@ def search_articles():
 
 @app.route('/api/stats')
 def get_stats():
-    """API端点：获取统计信息"""
+    """API端点：获取数据库统计信息"""
+    if db is None:
+        logger.error("数据库连接不可用，无法获取统计信息")
+        return jsonify({
+            'status': 'error',
+            'message': '数据库连接失败，请稍后重试'
+        }), 500
+        
     try:
         # 获取总文章数
         total_articles = db.get_article_count()
@@ -313,18 +382,24 @@ def get_stats():
             'error': str(e)
         }), 500
 
-def main():
-    """启动API服务 (用于本地测试)"""
-    # 监听 0.0.0.0 允许外部访问
-    print("API服务 (本地测试) 已启动，正在监听 http://0.0.0.0:8080")
-    # debug=True 方便本地调试
-    app.run(host='0.0.0.0', port=8080, debug=True)
+# 添加一个简单的健康检查接口，用于验证 API 是否正常运行
+@app.route('/api/health')
+def health_check():
+    """API端点：健康检查"""
+    try:
+        # 如果数据库连接可用，执行简单查询验证连接
+        db_status = "连接正常" if db and hasattr(db, 'check_connection') and db.check_connection() else "未连接"
+    except Exception as e:
+        logger.error(f"健康检查中数据库连接测试失败: {e}")
+        db_status = f"连接错误: {str(e)}"
+    
+    response = {
+        'status': 'online',
+        'timestamp': datetime.datetime.now().isoformat(),
+        'database': db_status,
+        'environment': os.environ.get('VERCEL_ENV', 'development')
+    }
+    return jsonify(response)
 
-if __name__ == '__main__':
-    main()
-
-# --- 重新添加 Vercel Serverless Function Handler ---
-def handler(environ, start_response):
-    """Vercel Serverless Function WSGI handler."""
-    # 直接将请求传递给 Flask app
-    return app(environ, start_response)
+# 注意：移除了 main() 和 handler() 函数
+# Vercel Serverless Functions 直接查找名为 'app' 的 Flask 实例

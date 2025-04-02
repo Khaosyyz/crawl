@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 dateInfoEl.textContent = `Date range not available (Page ${currentDatePage} / ${totalDatePages || 'Unknown'} of ${totalDatePages || 'Unknown'} pages)`;
             }
-         } else {
+        } else {
              console.warn(`Date information element not found for source ${sourceKey}`);
          }
     }
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<p class="no-articles">当前日期范围内没有找到资讯。</p>';
             return;
         }
-
+        
         const groupContainer = document.createElement('div');
         groupContainer.className = 'news-group crunchbase-group';
         container.appendChild(groupContainer);
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             groupContainer.after(extraCardsContainer);
 
-            const buttonContainer = document.createElement('div');
+        const buttonContainer = document.createElement('div');
             buttonContainer.className = 'date-group-buttons'; // Reuse class, maybe rename later
 
             const showMoreBtn = document.createElement('button');
@@ -352,17 +352,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const paginationContainer = elements[sourceKey].pagination;
         if (!paginationContainer) return;
         paginationContainer.innerHTML = ''; // 清空旧按钮
-
-        if (totalPages <= 1) {
+        
+            if (totalPages <= 1) {
             paginationContainer.style.display = 'none'; // 如果只有一页或没有页，隐藏分页
-            return;
-        }
+                return;
+            }
         paginationContainer.style.display = 'flex'; // 确保显示
-
+            
         const maxPagesToShow = 5; // 最多显示 5 个页码按钮
-
+            
         // 上一页按钮
-        const prevBtn = document.createElement('button');
+            const prevBtn = document.createElement('button');
         prevBtn.innerHTML = '&laquo;'; // «
         prevBtn.disabled = currentPage <= 1;
         prevBtn.dataset.page = currentPage - 1;
@@ -386,18 +386,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 页码按钮
-        for (let i = startPage; i <= endPage; i++) {
-            const pageBtn = document.createElement('button');
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
             pageBtn.textContent = i;
             pageBtn.dataset.page = i;
             pageBtn.classList.add('page-btn');
             if (i === currentPage) {
-                pageBtn.classList.add('active');
+                    pageBtn.classList.add('active');
                 pageBtn.disabled = true; // 当前页按钮不可点击
+                }
+                paginationContainer.appendChild(pageBtn);
             }
-            paginationContainer.appendChild(pageBtn);
-        }
-
+            
         // 省略号 (如果需要)
         if (endPage < totalPages) {
             const ellipsis = document.createElement('span');
@@ -407,12 +407,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 下一页按钮
-        const nextBtn = document.createElement('button');
+            const nextBtn = document.createElement('button');
         nextBtn.innerHTML = '&raquo;'; // »
         nextBtn.disabled = currentPage >= totalPages;
         nextBtn.dataset.page = currentPage + 1;
         nextBtn.classList.add('page-btn', 'prev-next');
-        paginationContainer.appendChild(nextBtn);
+            paginationContainer.appendChild(nextBtn);
     }
 
     // --- API 请求函数 (最终) ---
@@ -529,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      console.error("Could not find extra cards container for date group:", dateGroup);
                      return;
                  }
-            } else {
+                } else {
                  // For Crunchbase (no date group), assume it's the direct previous sibling
                  extraCardsContainer = buttonContainer.previousElementSibling;
                  if (!extraCardsContainer || !extraCardsContainer.classList.contains('extra-cards')) {
