@@ -142,12 +142,46 @@ def get_articles():
         start_date = (reference_date - datetime.timedelta(days=end_days_ago)).replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = (reference_date - datetime.timedelta(days=start_days_ago)).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        # MongoDB 查询使用 datetime 对象更可靠
-        date_query = {'date_time': {'$gte': start_date, '$lte': end_date}}
+        # 转换为字符串格式进行查询 (因为数据库中存储的可能是字符串)
+        start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
+        end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 同时尝试日期对象和字符串格式查询
+        date_query = {
+            '$or': [
+                # 尝试日期时间字符串格式匹配
+                {'date_time': {'$gte': start_date_str, '$lte': end_date_str}},
+                # 尝试日期对象匹配
+                {'date_time': {'$gte': start_date, '$lte': end_date}},
+                # 尝试只匹配日期部分 (针对不同格式)
+                {'date_time': {'$regex': f"^({start_date.strftime('%Y-%m-%d')}|{start_date.strftime('%Y/%m/%d')}).*"}}
+            ]
+        }
+        
         logger.info(f"查询日期范围: {start_date.isoformat()} 到 {end_date.isoformat()}")
+        logger.info(f"日期查询条件: {date_query}")
+
+        # 添加调试查询 - 不带日期限制先查一下
+        try:
+            # 查询5篇最新文章
+            test_articles = db.get_articles(
+                query={'source': source},
+                limit=5,
+                sort=[('date_time', -1)]
+            )
+            
+            logger.info(f"测试查询 source={source} 结果: 找到 {len(test_articles)} 篇文章")
+            if test_articles:
+                for idx, article in enumerate(test_articles):
+                    date_val = article.get('date_time', '无日期')
+                    title = article.get('title', '无标题')[:30]
+                    logger.info(f"测试文章 {idx+1}: 日期={date_val}, 类型={type(date_val)}, 标题={title}")
+        except Exception as e:
+            logger.error(f"测试查询失败: {e}")
 
         # 合并查询条件
         query = {**base_query, **date_query}
+        logger.info(f"最终查询条件: {query}")
         # --- 日期范围逻辑结束 ---
 
         # 计算跳过的记录数
@@ -400,6 +434,78 @@ def health_check():
         'environment': os.environ.get('VERCEL_ENV', 'development')
     }
     return jsonify(response)
+
+@app.route('/api/all-articles')
+def get_all_articles():
+    """API端点：获取所有文章（不进行日期过滤，仅用于测试）"""
+    if db is None:
+        logger.error("数据库连接不可用，无法获取文章")
+        return jsonify({
+            'status': 'error',
+            'message': '数据库连接失败，请稍后重试'
+        }), 500
+        
+    try:
+        # 获取分页参数
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        # 获取数据源过滤参数
+        source = request.args.get('source', 'x.com')  # 默认源改为 x.com
+        
+        # 构建基础查询条件
+        query = {'source': source}
+        
+        # 计算跳过的记录数
+        skip = (page - 1) * per_page
+        
+        # 获取总文章数
+        total_articles = db.get_article_count(query)
+        logger.info(f"查询条件 {query} 下找到的文章总数: {total_articles}")
+        
+        # 获取分页数据
+        articles = db.get_articles(
+            query=query,
+            skip=skip,
+            limit=per_page,
+            sort=[('date_time', -1)]  # 按时间倒序排序
+        )
+        logger.info(f"为页面 {page} 获取到文章列表: {len(articles)} 篇")
+        
+        # 处理返回值
+        response_data = {
+            'status': 'success',
+            'total': total_articles,
+            'page': page,
+            'per_page': per_page,
+            'source': source,
+            'data': articles,
+            'message': '这是测试API，返回所有文章而不进行日期过滤'
+        }
+        
+        # 检查是否是 JSONP 请求
+        callback = request.args.get('callback')
+        if callback:
+            jsonp_response = f"{callback}({json.dumps(response_data)})"
+            return Response(jsonp_response, mimetype='application/javascript')
+            
+        return jsonify(response_data)
+        
+    except Exception as e:
+        logger.error(f"获取所有文章列表出错: {e}")
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+        
+        callback = request.args.get('callback')
+        error_response = {
+            'status': 'error',
+            'message': '获取文章列表失败，请稍后再试',
+            'error': str(e)
+        }
+        
+        if callback:
+            jsonp_response = f"{callback}({json.dumps(error_response)})"
+            return Response(jsonp_response, mimetype='application/javascript')
+            
+        return jsonify(error_response), 500
 
 # 注意：移除了 main() 和 handler() 函数
 # Vercel Serverless Functions 直接查找名为 'app' 的 Flask 实例

@@ -2,12 +2,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Global State ---
     const state = {
         x: { currentPage: 1, currentDatePage: 1, currentSource: 'x.com' },
-        crunchbase: { currentPage: 1, currentDatePage: 1, currentSource: 'crunchbase.com' },
+        crunchbase: { currentPage: 1, currentDatePage: 1, currentSource: 'crunchbase.com' }, // 数据库中实际存储的源ID
         activeSource: 'x' // 'x' or 'crunchbase'
     };
 
     // --- Constants ---
     const API_BASE_URL = '/api/articles'; // 使用相对路径，指向 Vercel 上的 API
+    const TEST_API_URL = '/api/all-articles'; // 测试API端点，不进行日期过滤
+    const USE_TEST_API = true; // 设置为 true 使用测试API端点
     const ARTICLES_PER_PAGE = { x: 9, crunchbase: 3 }; // Different sources per page articles
 
     // --- DOM Elements ---
@@ -422,7 +424,9 @@ document.addEventListener('DOMContentLoaded', () => {
         clearContainer(sourceKey);
 
         const sourceState = state[sourceKey];
-        const apiUrl = `${API_BASE_URL}?source=${sourceState.currentSource}&page=${sourceState.currentPage}&date_page=${sourceState.currentDatePage}`;
+        // 根据USE_TEST_API决定使用哪个API端点
+        const apiBaseUrl = USE_TEST_API ? TEST_API_URL : API_BASE_URL;
+        const apiUrl = `${apiBaseUrl}?source=${sourceState.currentSource}&page=${sourceState.currentPage}${USE_TEST_API ? '&per_page=' + ARTICLES_PER_PAGE[sourceKey] : '&date_page=' + sourceState.currentDatePage}`;
 
         console.log(`请求数据 (${sourceKey}): ${apiUrl}`);
 
@@ -437,25 +441,49 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`收到数据 (${sourceKey}):`, data);
 
             if (data.status === 'success') {
-                updateDateInfo(sourceKey, data.date_range, sourceState.currentDatePage, data.total_date_pages);
-                updateDatePaginationButtons(sourceKey, sourceState.currentDatePage, data.total_date_pages);
-
-                // 调用实际的渲染函数
-                if (sourceKey === 'x') {
-                    renderXArticles(data.data, sourceKey);
+                // 根据API端点不同处理不同的返回数据结构
+                if (USE_TEST_API) {
+                    // 测试API没有日期范围和日期分页，使用默认值
+                    const defaultDateRange = {
+                        start: '2025-03-01',
+                        end: '2025-04-01'
+                    };
+                    updateDateInfo(sourceKey, defaultDateRange, 1, 1);
+                    updateDatePaginationButtons(sourceKey, 1, 1);
+                    
+                    // 调用实际的渲染函数
+                    if (sourceKey === 'x') {
+                        renderXArticles(data.data, sourceKey);
+                    } else {
+                        renderCrunchbaseArticles(data.data, sourceKey);
+                    }
+                    
+                    // 渲染文章分页
+                    const totalArticlePages = data.total > 0 ? Math.ceil(data.total / ARTICLES_PER_PAGE[sourceKey]) : 0;
+                    renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
                 } else {
-                    renderCrunchbaseArticles(data.data, sourceKey);
+                    // 原始API有日期范围和日期分页
+                    updateDateInfo(sourceKey, data.date_range, sourceState.currentDatePage, data.total_date_pages);
+                    updateDatePaginationButtons(sourceKey, sourceState.currentDatePage, data.total_date_pages);
+
+                    // 调用实际的渲染函数
+                    if (sourceKey === 'x') {
+                        renderXArticles(data.data, sourceKey);
+                    } else {
+                        renderCrunchbaseArticles(data.data, sourceKey);
+                    }
+
+                    // 渲染文章分页
+                    const totalArticlePages = data.total_in_date_range > 0 ? Math.ceil(data.total_in_date_range / ARTICLES_PER_PAGE[sourceKey]) : 0;
+                    renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
                 }
-
-                // 渲染文章分页
-                const totalArticlePages = data.total_in_date_range > 0 ? Math.ceil(data.total_in_date_range / ARTICLES_PER_PAGE[sourceKey]) : 0;
-                renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
-
             } else {
                 throw new Error(data.message || 'API 返回错误状态');
             }
         } catch (error) {
-            // ... (错误处理无变化) ...
+            console.error(`获取数据错误: ${error.message}`);
+            showError(`获取数据失败，请稍后再试或检查API服务状态。${error.message}`);
+            errorMessageDiv.style.display = 'block';
         } finally {
             hideLoading();
         }
