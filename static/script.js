@@ -168,12 +168,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createCrunchbaseCard(article) {
         const card = document.createElement('div');
-        card.className = 'news-card crunchbase-card'; // 添加 crunchbase-card 类
+        card.className = 'news-card crunchbase-card';
 
         const title = article.title || '无标题';
         let content = article.content || '无内容';
         const author = article.author || '未提供';
-        const date = article.date_time ? article.date_time.substring(0, 10) : '未知日期'; // YYYY-MM-DD
+        const date = article.date_time ? article.date_time.substring(0, 10) : '未知日期';
         const url = article.source_url || '#';
 
         const company = article.company || '未提供';
@@ -181,9 +181,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const fundingAmount = article.funding_amount || '未提供';
         const investors = article.investors || '未提供';
 
-        const isLongContent = content.length > 250; // 阈值可调整
+        const isLongContent = content.length > 250;
 
-        // 链接处理
         content = content.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 
         card.innerHTML = `
@@ -196,20 +195,36 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="news-card-content content-collapsible ${isLongContent ? 'collapsed' : ''}">
                 <p>${content}</p>
-                ${isLongContent ? '<div class="content-fade-button"><i class="fas fa-chevron-down"></i> 展开</div>' : ''}
+                ${isLongContent ? '<div class="content-fade-button">展开</div>' : ''}
             </div>
             <div class="news-card-footer">
                 <div class="investment-details">
-                     ${company !== '未提供' ? `<div><span class="label">公司:</span> ${company}</div>` : ''}
-                     ${fundingRound !== '未提供' ? `<div><span class="label">轮次:</span> ${fundingRound}</div>` : ''}
-                     ${fundingAmount !== '未提供' ? `<div><span class="label">金额:</span> ${fundingAmount}</div>` : ''}
-                     ${investors !== '未提供' ? `<div><span class="label">投资方:</span> ${investors}</div>` : ''}
-                 </div>
+                    ${company !== '未提供' ? `<div><span class="label">公司:</span> ${company}</div>` : ''}
+                    ${fundingRound !== '未提供' ? `<div><span class="label">轮次:</span> ${fundingRound}</div>` : ''}
+                    ${fundingAmount !== '未提供' ? `<div><span class="label">金额:</span> ${fundingAmount}</div>` : ''}
+                    ${investors !== '未提供' ? `<div><span class="label">投资方:</span> ${investors}</div>` : ''}
+                </div>
                 <div class="news-action-row">
-                    <a href="${url}" target="_blank" class="read-original-btn" title="阅读原文"><i class="fas fa-external-link-alt"></i> 阅读原文</a>
+                    <a href="${url}" target="_blank" class="read-original-btn" title="阅读原文">
+                        <i class="fas fa-external-link-alt"></i>
+                        阅读原文
+                    </a>
                 </div>
             </div>
         `;
+
+        // 为长内容添加展开/收起功能
+        if (isLongContent) {
+            const contentDiv = card.querySelector('.content-collapsible');
+            const fadeButton = contentDiv.querySelector('.content-fade-button');
+            
+            fadeButton.addEventListener('click', () => {
+                const isCollapsed = contentDiv.classList.contains('collapsed');
+                contentDiv.classList.toggle('collapsed');
+                fadeButton.textContent = isCollapsed ? '收起' : '展开';
+            });
+        }
+
         return card;
     }
 
