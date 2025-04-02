@@ -14,6 +14,18 @@
     {
       "src": "/api/(.*)",
       "dest": "api/api.py"
+    },
+    {
+       "src": "/static/(.*)",
+       "headers": { "cache-control": "s-maxage=31536000, immutable" },
+       "dest": "/static/$1"
+     },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/static/index.html"
     }
   ]
 } 
