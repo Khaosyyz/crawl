@@ -246,16 +246,11 @@ main {
 }
 
 .news-card-footer {
-    padding: 0.75rem 1.25rem;
+    padding: 12px 15px;
     background-color: #f8f9fa;
     border-top: 1px solid #e9ecef;
-    font-size: 0.85rem;
-    color: #6c757d;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    flex-direction: column;
 }
 
 .news-meta {
@@ -1145,4 +1140,136 @@ footer {
     justify-content: center;
     padding: 0 0.5rem;
     color: #6c757d;
+}
+
+/* 调整X卡片布局样式 */
+.news-meta-row, .news-stats-row, .news-action-row {
+    display: flex;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+.news-meta-row {
+    justify-content: space-between;
+    align-items: center;
+}
+
+.news-stats-row {
+    justify-content: space-around;
+    align-items: center;
+}
+
+.news-action-row {
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.news-author, .news-time {
+    display: flex;
+    align-items: center;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.news-author i, .news-time i {
+    margin-right: 5px;
+}
+
+.news-stat-item {
+    display: flex;
+    align-items: center;
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+.news-stat-item i {
+    margin-right: 5px;
+}
+
+/* 新的阅读原文按钮样式 */
+.read-original-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 20px;
+    background-color: #f8f9fa;
+    color: #007bff;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    border: 1px solid #dee2e6;
+}
+
+.read-original-btn:hover {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.read-original-btn i {
+    margin-right: 6px;
+}
+
+/* 修复Crunchbase展开/收起按钮样式 */
+.content-collapsible.collapsed .content-fade-button {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,1) 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 10px;
+    color: #007bff;
+    cursor: pointer;
+}
+
+.content-collapsible:not(.collapsed) .content-fade-button {
+    position: static;
+    height: auto;
+    background: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 10px auto;
+    padding: 6px 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    width: auto;
+}
+
+/* 为展开后的按钮添加样式 */
+.expanded-button {
+    width: fit-content !important;
+    margin: 10px auto !important;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 20px !important;
+    padding: 6px 16px !important;
+    background: none !important;
+    color: #007bff !important;
+    box-shadow: none !important;
+}
+
+.expanded-button:hover {
+    background-color: #f8f9fa !important;
+    color: #0056b3 !important;
+}
+
+.expanded-button i {
+    transform: rotate(180deg);
+    margin-right: 6px;
+}
+
+/* 优化新闻卡片底部区域 */
+.news-card-footer {
+    padding: 12px 15px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
 }

@@ -149,19 +149,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>${content}</p>
             </div>
             <div class="news-card-footer">
-                <div class="news-info-row">
-                    <div class="news-meta">
-                        <span class="author"><i class="fas fa-user"></i> ${author}</span>
-                        <span class="time"><i class="fas fa-clock"></i> ${timePart}</span>
-                    </div>
-                    <div class="news-stats">
-                        <span title="粉丝数"><i class="fas fa-users"></i> ${formatNumber(article.followers || 0)}</span>
-                        <span title="点赞数"><i class="fas fa-heart"></i> ${formatNumber(article.likes || 0)}</span>
-                        <span title="转发数"><i class="fas fa-retweet"></i> ${formatNumber(article.retweets || 0)}</span>
-                    </div>
+                <div class="news-meta-row">
+                    <div class="news-author"><i class="fas fa-user"></i> ${author}</div>
+                    <div class="news-time"><i class="fas fa-clock"></i> ${timePart}</div>
                 </div>
-                <div class="news-actions">
-                    <a href="${url}" target="_blank" class="view-original-btn" title="查看原文"><i class="fas fa-external-link-alt"></i></a>
+                <div class="news-stats-row">
+                    <div class="news-stat-item" title="粉丝数"><i class="fas fa-users"></i> ${formatNumber(article.followers || 0)}</div>
+                    <div class="news-stat-item" title="点赞数"><i class="fas fa-heart"></i> ${formatNumber(article.likes || 0)}</div>
+                    <div class="news-stat-item" title="转发数"><i class="fas fa-retweet"></i> ${formatNumber(article.retweets || 0)}</div>
+                </div>
+                <div class="news-action-row">
+                    <a href="${url}" target="_blank" class="read-original-btn" title="阅读原文"><i class="fas fa-external-link-alt"></i> 阅读原文</a>
                 </div>
             </div>
         `;
@@ -207,7 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
                      ${fundingAmount !== '未提供' ? `<div><span class="label">金额:</span> ${fundingAmount}</div>` : ''}
                      ${investors !== '未提供' ? `<div><span class="label">投资方:</span> ${investors}</div>` : ''}
                  </div>
-                <a href="${url}" target="_blank" class="view-original-btn" title="查看原文"><i class="fas fa-external-link-alt"></i></a>
+                <div class="news-action-row">
+                    <a href="${url}" target="_blank" class="read-original-btn" title="阅读原文"><i class="fas fa-external-link-alt"></i> 阅读原文</a>
+                </div>
             </div>
         `;
         return card;
@@ -632,9 +632,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isCollapsed) {
                     contentDiv.classList.remove('collapsed');
                     target.innerHTML = '<i class="fas fa-chevron-up"></i> 收起';
+                    target.classList.add('expanded-button');
                 } else {
                     contentDiv.classList.add('collapsed');
                     target.innerHTML = '<i class="fas fa-chevron-down"></i> 展开';
+                    target.classList.remove('expanded-button');
                 }
             }
         });
