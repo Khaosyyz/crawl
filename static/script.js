@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<p class="no-articles">当前日期范围内没有找到资讯。</p>';
             return;
         }
-
+        
         console.log(`准备渲染 ${articles.length} 篇文章`);
 
         // 按日期分组
@@ -382,11 +382,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!paginationContainer) return;
         paginationContainer.innerHTML = ''; // 清空旧按钮
         
-        if (totalPages <= 1) {
+            if (totalPages <= 1) {
             paginationContainer.style.display = 'none'; // 如果只有一页或没有页，隐藏分页
-            return;
-        }
-        
+                return;
+            }
+            
         paginationContainer.style.display = 'flex'; // 确保显示
         
         // 首页按钮
@@ -399,14 +399,14 @@ document.addEventListener('DOMContentLoaded', () => {
         paginationContainer.appendChild(firstBtn);
         
         // 上一页按钮
-        const prevBtn = document.createElement('button');
+            const prevBtn = document.createElement('button');
         prevBtn.innerHTML = '&lsaquo;'; // ‹
-        prevBtn.title = '上一页';
+            prevBtn.title = '上一页';
         prevBtn.disabled = currentPage <= 1;
         prevBtn.dataset.page = currentPage - 1;
         prevBtn.classList.add('page-btn', 'page-nav');
-        paginationContainer.appendChild(prevBtn);
-
+            paginationContainer.appendChild(prevBtn);
+            
         // 计算要显示的页码范围
         const maxVisiblePages = 5; // 最多显示5个页码按钮
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
@@ -434,18 +434,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 页码按钮
-        for (let i = startPage; i <= endPage; i++) {
-            const pageBtn = document.createElement('button');
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
             pageBtn.textContent = i;
             pageBtn.dataset.page = i;
             pageBtn.classList.add('page-btn');
             if (i === currentPage) {
-                pageBtn.classList.add('active');
+                    pageBtn.classList.add('active');
                 pageBtn.disabled = true; // 当前页按钮不可点击
+                }
+                paginationContainer.appendChild(pageBtn);
             }
-            paginationContainer.appendChild(pageBtn);
-        }
-        
+            
         // 添加 "...N" 如果不到最后一页
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
@@ -463,13 +463,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 下一页按钮
-        const nextBtn = document.createElement('button');
+            const nextBtn = document.createElement('button');
         nextBtn.innerHTML = '&rsaquo;'; // ›
-        nextBtn.title = '下一页';
+            nextBtn.title = '下一页';
         nextBtn.disabled = currentPage >= totalPages;
         nextBtn.dataset.page = currentPage + 1;
         nextBtn.classList.add('page-btn', 'page-nav');
-        paginationContainer.appendChild(nextBtn);
+            paginationContainer.appendChild(nextBtn);
         
         // 末页按钮
         const lastBtn = document.createElement('button');
@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 调用实际的渲染函数
                         if (sourceKey === 'x') {
                             renderXArticles(data.data, sourceKey);
-                        } else {
+            } else {
                             renderCrunchbaseArticles(data.data, sourceKey);
                         }
 
@@ -560,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (retryCount > maxRetries) {
                     showError(`获取数据失败，请稍后再试或检查API服务状态。Failed to fetch`);
                     if (errorMessageDiv) errorMessageDiv.style.display = 'block';
-                } else {
+                    } else {
                     // 否则，等待一段时间后重试
                     await new Promise(resolve => setTimeout(resolve, 800 * retryCount)); // 重试延迟时间递增
                 }
@@ -592,7 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 添加活动类到当前标签链接
         if (event) {
             event.currentTarget.classList.add('active');
-        } else {
+                } else {
             // 初始化调用时没有事件对象
             const linkForContent = document.querySelector(`[onclick*="${contentId}"]`);
             if (linkForContent) linkForContent.classList.add('active');
@@ -650,26 +650,6 @@ document.addEventListener('DOMContentLoaded', () => {
                          }
                      }
                  });
-            }
-        });
-
-        // Crunchbase 内容展开/收起监听器 (使用事件委托)
-        document.addEventListener('click', (event) => {
-            const target = event.target.closest('.content-fade-button');
-            if (!target) return;
-            
-            const contentDiv = target.closest('.content-collapsible');
-            if (contentDiv) {
-                const isCollapsed = contentDiv.classList.contains('collapsed');
-                if (isCollapsed) {
-                    contentDiv.classList.remove('collapsed');
-                    target.innerHTML = '<i class="fas fa-chevron-up"></i> 收起';
-                    target.classList.add('expanded-button');
-                } else {
-                    contentDiv.classList.add('collapsed');
-                    target.innerHTML = '<i class="fas fa-chevron-down"></i> 展开';
-                    target.classList.remove('expanded-button');
-                }
             }
         });
 
