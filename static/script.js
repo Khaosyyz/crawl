@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Constants ---
     const API_BASE_URL = '/api/articles'; // 使用相对路径，指向 Vercel 上的 API
     const TEST_API_URL = '/api/all-articles'; // 测试API端点，不进行日期过滤
-    const USE_TEST_API = true; // 设置为 true 使用测试API端点
+    const USE_TEST_API = true; // 保持使用测试API端点
     const ARTICLES_PER_PAGE = { x: 9, crunchbase: 3 }; // Different sources per page articles
 
     // --- DOM Elements ---
@@ -226,11 +226,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        console.log(`准备渲染 ${articles.length} 篇文章`);
+
         const groupedArticles = groupArticlesByDate(articles);
         const dateKeys = Object.keys(groupedArticles).sort().reverse();
 
+        console.log(`按日期分组后有 ${dateKeys.length} 个日期组`);
+
         dateKeys.forEach(date => {
             const articlesForDate = groupedArticles[date];
+            console.log(`日期 ${date} 有 ${articlesForDate.length} 篇文章`);
+            
             const dateHeader = document.createElement('h4');
             dateHeader.className = 'date-group-header';
             dateHeader.textContent = date;

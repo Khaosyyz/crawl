@@ -146,15 +146,23 @@ def get_articles():
         start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
         end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
         
-        # 同时尝试日期对象和字符串格式查询
+        # 日期部分（不含时间）
+        start_date_only = start_date.strftime('%Y-%m-%d')
+        end_date_only = end_date.strftime('%Y-%m-%d')
+        
+        # 同时尝试多种日期格式查询
         date_query = {
             '$or': [
-                # 尝试日期时间字符串格式匹配
+                # 尝试完整日期时间字符串格式匹配 (标准格式)
                 {'date_time': {'$gte': start_date_str, '$lte': end_date_str}},
+                # 尝试ISO格式匹配
+                {'date_time': {'$gte': start_date.isoformat(), '$lte': end_date.isoformat()}},
+                # 尝试只匹配日期部分 (最常见格式)
+                {'date_time': {'$regex': f"^{start_date_only}"}},
+                # 尝试匹配日期范围的任何一天 (更宽松的匹配)
+                {'date_time': {'$regex': f"^2025-03-"}},
                 # 尝试日期对象匹配
-                {'date_time': {'$gte': start_date, '$lte': end_date}},
-                # 尝试只匹配日期部分 (针对不同格式)
-                {'date_time': {'$regex': f"^({start_date.strftime('%Y-%m-%d')}|{start_date.strftime('%Y/%m/%d')}).*"}}
+                {'date_time': {'$gte': start_date, '$lte': end_date}}
             ]
         }
         
