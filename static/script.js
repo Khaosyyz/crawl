@@ -12,6 +12,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const USE_TEST_API = true; // 保持使用测试API端点
     const ARTICLES_PER_PAGE = { x: 9, crunchbase: 3 }; // Different sources per page articles
 
+    // 缓存配置
+    const CACHE_ENABLED = true; // 全局缓存开关
+    const CACHE_EXPIRY = {
+        DEFAULT: 30 * 60 * 1000, // 默认30分钟
+        HOME_PAGE: 15 * 60 * 1000, // 首页15分钟
+        ARCHIVE: 24 * 60 * 60 * 1000 // 归档内容24小时
+    };
+    const DB_VERSION = 1; // 数据库版本号，用于升级
+    const DB_NAME = 'crawArticleCache'; // 数据库名称
+
     // --- DOM Elements ---
     const loadingIndicator = document.getElementById('loading-indicator');
     const errorMessageDiv = document.getElementById('error-message');
@@ -482,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- API 请求函数 (最终) ---
-    async function fetchArticles(sourceKey) {
+    async function fetchArticles(sourceKey, source, page = 1, dateRange = null) {
         showLoading();
         hideError();
         clearContainer(sourceKey);
@@ -493,6 +503,74 @@ document.addEventListener('DOMContentLoaded', () => {
         const apiUrl = `${apiBaseUrl}?source=${sourceState.currentSource}&page=${sourceState.currentPage}${USE_TEST_API ? '&per_page=' + ARTICLES_PER_PAGE[sourceKey] : '&date_page=' + sourceState.currentDatePage}`;
 
         console.log(`请求数据 (${sourceKey}): ${apiUrl}`);
+
+        // 尝试从缓存获取数据
+        if (CACHE_ENABLED) {
+            try {
+                // 生成当前视图的缓存键参数
+                const cacheDateRange = USE_TEST_API ? null : state[sourceKey].dateRange;
+                const cacheSource = sourceState.currentSource;
+                const cachePage = sourceState.currentPage;
+                
+                console.log('尝试从缓存获取数据:', sourceKey, cacheSource, cachePage, cacheDateRange);
+                const cachedData = await cacheManager.getFromCache(
+                    sourceKey, 
+                    cacheSource, 
+                    cachePage, 
+                    cacheDateRange
+                );
+                
+                if (cachedData) {
+                    console.log('使用缓存数据');
+                    
+                    // 处理缓存数据，逻辑与API响应处理相同
+                    if (cachedData.status === 'success') {
+                        // 根据API端点不同处理不同的返回数据结构
+                        if (USE_TEST_API) {
+                            // 测试API处理逻辑
+                            const defaultDateRange = {
+                                start: '2025-03-01',
+                                end: '2025-04-01'
+                            };
+                            updateDateInfo(sourceKey, defaultDateRange, 1, 1);
+                            updateDatePaginationButtons(sourceKey, 1, 1);
+                            
+                            // 调用实际的渲染函数
+                            if (sourceKey === 'x') {
+                                renderXArticles(cachedData.data, sourceKey);
+                            } else {
+                                renderCrunchbaseArticles(cachedData.data, sourceKey);
+                            }
+                            
+                            // 渲染文章分页
+                            const totalArticlePages = cachedData.total > 0 ? Math.ceil(cachedData.total / ARTICLES_PER_PAGE[sourceKey]) : 0;
+                            renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
+                        } else {
+                            // 原始API处理逻辑
+                            updateDateInfo(sourceKey, cachedData.date_range, sourceState.currentDatePage, cachedData.total_date_pages);
+                            updateDatePaginationButtons(sourceKey, sourceState.currentDatePage, cachedData.total_date_pages);
+
+                            // 调用实际的渲染函数
+                            if (sourceKey === 'x') {
+                                renderXArticles(cachedData.data, sourceKey);
+                            } else {
+                                renderCrunchbaseArticles(cachedData.data, sourceKey);
+                            }
+
+                            // 渲染文章分页
+                            const totalArticlePages = cachedData.total_in_date_range > 0 ? Math.ceil(cachedData.total_in_date_range / ARTICLES_PER_PAGE[sourceKey]) : 0;
+                            renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
+                        }
+                        
+                        hideLoading();
+                        return; // 使用缓存数据后直接返回
+                    }
+                }
+            } catch (error) {
+                console.error('读取缓存失败:', error);
+                // 缓存读取失败，继续使用API获取数据
+            }
+        }
 
         // 最大重试次数
         const maxRetries = 2;
@@ -508,6 +586,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const data = await response.json();
                 console.log(`收到数据 (${sourceKey}):`, data);
+
+                // 缓存数据
+                if (CACHE_ENABLED && data.status === 'success') {
+                    const cacheDateRange = USE_TEST_API ? null : data.date_range;
+                    cacheManager.saveToCache(
+                        sourceKey, 
+                        sourceState.currentSource, 
+                        sourceState.currentPage, 
+                        cacheDateRange, 
+                        data
+                    );
+                }
 
                 if (data.status === 'success') {
                     // 成功获取数据，处理响应
@@ -541,7 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 调用实际的渲染函数
                         if (sourceKey === 'x') {
                             renderXArticles(data.data, sourceKey);
-            } else {
+                        } else {
                             renderCrunchbaseArticles(data.data, sourceKey);
                         }
 
@@ -560,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (retryCount > maxRetries) {
                     showError(`获取数据失败，请稍后再试或检查API服务状态。Failed to fetch`);
                     if (errorMessageDiv) errorMessageDiv.style.display = 'block';
-                    } else {
+                } else {
                     // 否则，等待一段时间后重试
                     await new Promise(resolve => setTimeout(resolve, 800 * retryCount)); // 重试延迟时间递增
                 }
@@ -705,6 +795,321 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialTabButton = document.querySelector('.tab-link.active');
     const initialContentId = initialTabButton ? initialTabButton.getAttribute('onclick').match(/openSource\(event, '(.*?)'\)/)[1] : 'x-content';
     window.openSource(null, initialContentId);
+
+    // --- IndexedDB缓存管理类 ---
+    class CacheManager {
+        constructor() {
+            this.db = null;
+            this.isInitialized = false;
+            this._init();
+        }
+
+        async _init() {
+            if (!CACHE_ENABLED || !window.indexedDB) {
+                console.log('缓存未启用或浏览器不支持IndexedDB');
+                return;
+            }
+
+            try {
+                // 打开数据库
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                // 数据库升级事件
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    // 创建存储对象，按数据源分类
+                    if (!db.objectStoreNames.contains('xArticles')) {
+                        const xStore = db.createObjectStore('xArticles', { keyPath: 'cacheKey' });
+                        xStore.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                    
+                    if (!db.objectStoreNames.contains('crunchbaseArticles')) {
+                        const cbStore = db.createObjectStore('crunchbaseArticles', { keyPath: 'cacheKey' });
+                        cbStore.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                    
+                    console.log('数据库架构初始化完成');
+                };
+                
+                // 数据库打开成功
+                request.onsuccess = (event) => {
+                    this.db = event.target.result;
+                    this.isInitialized = true;
+                    console.log('缓存数据库连接成功');
+                    
+                    // 连接成功后启动缓存清理
+                    this._cleanupExpiredCache();
+                };
+                
+                // 错误处理
+                request.onerror = (event) => {
+                    console.error('打开缓存数据库失败:', event.target.error);
+                    this.isInitialized = false;
+                };
+            } catch (error) {
+                console.error('初始化缓存系统时发生错误:', error);
+                this.isInitialized = false;
+            }
+        }
+        
+        // 生成缓存键
+        _generateCacheKey(sourceKey, source, page, dateRange) {
+            const dateStr = dateRange ? `${dateRange.start}_${dateRange.end}` : 'all';
+            return `${sourceKey}_${source}_${dateStr}_page${page}`;
+        }
+        
+        // 获取存储对象名称
+        _getStoreName(sourceKey) {
+            return sourceKey === 'x' ? 'xArticles' : 'crunchbaseArticles';
+        }
+        
+        // 从缓存获取数据
+        async getFromCache(sourceKey, source, page, dateRange) {
+            if (!this.isInitialized || !CACHE_ENABLED) {
+                return null;
+            }
+            
+            const cacheKey = this._generateCacheKey(sourceKey, source, page, dateRange);
+            const storeName = this._getStoreName(sourceKey);
+            
+            try {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.get(cacheKey);
+                    
+                    request.onsuccess = (event) => {
+                        const cachedData = event.target.result;
+                        
+                        // 检查缓存是否存在且未过期
+                        if (cachedData && Date.now() - cachedData.timestamp < cachedData.expiryTime) {
+                            console.log(`命中缓存: ${cacheKey}`);
+                            
+                            // 更新缓存访问时间戳，用于LRU策略
+                            this._updateAccessTimestamp(sourceKey, cacheKey);
+                            
+                            resolve(cachedData.data);
+                        } else {
+                            if (cachedData) {
+                                console.log(`缓存已过期: ${cacheKey}`);
+                                // 删除过期缓存
+                                this._removeFromCache(sourceKey, cacheKey);
+                            } else {
+                                console.log(`缓存未命中: ${cacheKey}`);
+                            }
+                            resolve(null);
+                        }
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error(`读取缓存失败: ${cacheKey}`, event.target.error);
+                        resolve(null);
+                    };
+                });
+            } catch (error) {
+                console.error('从缓存获取数据时出错:', error);
+                return null;
+            }
+        }
+        
+        // 将数据保存到缓存
+        async saveToCache(sourceKey, source, page, dateRange, data) {
+            if (!this.isInitialized || !CACHE_ENABLED) {
+                return false;
+            }
+            
+            const cacheKey = this._generateCacheKey(sourceKey, source, page, dateRange);
+            const storeName = this._getStoreName(sourceKey);
+            
+            // 决定缓存过期时间
+            let expiryTime = CACHE_EXPIRY.DEFAULT;
+            if (page === 1 && (!dateRange || this._isRecentDate(dateRange))) {
+                expiryTime = CACHE_EXPIRY.HOME_PAGE; // 首页/最新内容
+            } else if (dateRange && this._isOldDate(dateRange)) {
+                expiryTime = CACHE_EXPIRY.ARCHIVE; // 归档内容
+            }
+            
+            const cacheItem = {
+                cacheKey,
+                data,
+                timestamp: Date.now(),
+                lastAccessed: Date.now(),
+                expiryTime,
+                size: JSON.stringify(data).length
+            };
+            
+            try {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.put(cacheItem);
+                    
+                    request.onsuccess = () => {
+                        console.log(`已缓存: ${cacheKey}`);
+                        resolve(true);
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error(`缓存失败: ${cacheKey}`, event.target.error);
+                        resolve(false);
+                    };
+                });
+            } catch (error) {
+                console.error('保存数据到缓存时出错:', error);
+                return false;
+            }
+        }
+        
+        // 更新缓存访问时间戳
+        async _updateAccessTimestamp(sourceKey, cacheKey) {
+            if (!this.isInitialized) return;
+            
+            const storeName = this._getStoreName(sourceKey);
+            
+            try {
+                const transaction = this.db.transaction([storeName], 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.get(cacheKey);
+                
+                request.onsuccess = (event) => {
+                    const cacheItem = event.target.result;
+                    if (cacheItem) {
+                        cacheItem.lastAccessed = Date.now();
+                        store.put(cacheItem);
+                    }
+                };
+            } catch (error) {
+                console.error('更新缓存访问时间戳失败:', error);
+            }
+        }
+        
+        // 从缓存中移除项目
+        async _removeFromCache(sourceKey, cacheKey) {
+            if (!this.isInitialized) return;
+            
+            const storeName = this._getStoreName(sourceKey);
+            
+            try {
+                const transaction = this.db.transaction([storeName], 'readwrite');
+                const store = transaction.objectStore(storeName);
+                store.delete(cacheKey);
+            } catch (error) {
+                console.error('从缓存移除项目失败:', error);
+            }
+        }
+        
+        // 清理过期缓存
+        async _cleanupExpiredCache() {
+            if (!this.isInitialized) return;
+            
+            const storeNames = ['xArticles', 'crunchbaseArticles'];
+            const now = Date.now();
+            
+            for (const storeName of storeNames) {
+                try {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const cursorRequest = store.openCursor();
+                    
+                    cursorRequest.onsuccess = (event) => {
+                        const cursor = event.target.result;
+                        if (cursor) {
+                            const cacheItem = cursor.value;
+                            // 删除过期项目
+                            if (now - cacheItem.timestamp > cacheItem.expiryTime) {
+                                store.delete(cursor.key);
+                                console.log(`已清理过期缓存: ${cursor.key}`);
+                            }
+                            cursor.continue();
+                        }
+                    };
+                } catch (error) {
+                    console.error(`清理${storeName}过期缓存失败:`, error);
+                }
+            }
+            
+            // 每6小时执行一次清理
+            setTimeout(() => this._cleanupExpiredCache(), 6 * 60 * 60 * 1000);
+        }
+        
+        // 判断是否为最近日期范围
+        _isRecentDate(dateRange) {
+            if (!dateRange || !dateRange.start) return false;
+            
+            const startDate = new Date(dateRange.start);
+            const now = new Date();
+            const daysDiff = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+            
+            return daysDiff <= 7; // 最近7天内的内容
+        }
+        
+        // 判断是否为较早日期范围
+        _isOldDate(dateRange) {
+            if (!dateRange || !dateRange.start) return false;
+            
+            const startDate = new Date(dateRange.start);
+            const now = new Date();
+            const daysDiff = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+            
+            return daysDiff >= 30; // 30天前的内容
+        }
+        
+        // 清空所有缓存
+        async clearAllCache() {
+            if (!this.isInitialized) return;
+            
+            const storeNames = ['xArticles', 'crunchbaseArticles'];
+            
+            for (const storeName of storeNames) {
+                try {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    store.clear();
+                    console.log(`已清空${storeName}缓存`);
+                } catch (error) {
+                    console.error(`清空${storeName}缓存失败:`, error);
+                }
+            }
+        }
+    }
+
+    // 创建全局缓存管理器实例
+    const cacheManager = new CacheManager();
+
+    // 添加缓存控制按钮
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'cache-controls';
+    controlsContainer.style.position = 'fixed';
+    controlsContainer.style.bottom = '10px';
+    controlsContainer.style.right = '10px';
+    controlsContainer.style.zIndex = '1000';
+    
+    const clearCacheBtn = document.createElement('button');
+    clearCacheBtn.textContent = '清除缓存';
+    clearCacheBtn.className = 'clear-cache-btn';
+    clearCacheBtn.style.padding = '5px 10px';
+    clearCacheBtn.style.backgroundColor = '#f44336';
+    clearCacheBtn.style.color = 'white';
+    clearCacheBtn.style.border = 'none';
+    clearCacheBtn.style.borderRadius = '4px';
+    clearCacheBtn.style.cursor = 'pointer';
+    
+    clearCacheBtn.addEventListener('click', async () => {
+        try {
+            await cacheManager.clearAllCache();
+            alert('缓存已清除!');
+            // 刷新当前标签数据
+            if (state.activeSource) {
+                fetchArticles(state.activeSource);
+            }
+        } catch (error) {
+            console.error('清除缓存失败:', error);
+            alert('清除缓存失败: ' + error.message);
+        }
+    });
+    
+    controlsContainer.appendChild(clearCacheBtn);
+    document.body.appendChild(controlsContainer);
 });
 
 // GSAP 动画 (无变化)
