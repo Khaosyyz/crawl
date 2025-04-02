@@ -96,18 +96,21 @@ def run_scheduled_crawler(crawler_script_path: str):
     try:
         with open(log_file, 'w', buffering=1) as f:
             python_path = sys.executable
-            process = subprocess.Popen(
-                [python_path, '-u', full_script_path], # Use '-u' for unbuffered output
-                stdout=f,
-                stderr=subprocess.STDOUT, # Redirect stderr to stdout (logged to file)
-                text=True,
-                # bufsize=1, # text=True implies line buffering usually
-                env=dict(os.environ, PYTHONUNBUFFERED="1") # Ensure Python is unbuffered
-            )
-            running_crawlers[crawler_script_path] = process
-            logger.info(f"爬虫 {crawler_script_path} 已启动 (PID: {process.pid})")
+            # 修复错误：提供STDIN，避免init_sys_streams错误
+            with open(os.devnull, 'r') as devnull:
+                process = subprocess.Popen(
+                    [python_path, '-u', full_script_path], # Use '-u' for unbuffered output
+                    stdin=devnull,  # 提供空的标准输入
+                    stdout=f,
+                    stderr=subprocess.STDOUT, # Redirect stderr to stdout (logged to file)
+                    text=True,
+                    env=dict(os.environ, PYTHONUNBUFFERED="1") # Ensure Python is unbuffered
+                )
+                running_crawlers[crawler_script_path] = process
+                logger.info(f"爬虫 {crawler_script_path} 已启动 (PID: {process.pid})")
     except Exception as e:
         logger.error(f"启动爬虫 {crawler_script_path} 失败: {e}")
+        logger.error(traceback.format_exc())
         # Ensure it's removed from tracking if Popen failed
         if crawler_script_path in running_crawlers:
             del running_crawlers[crawler_script_path]
