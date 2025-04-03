@@ -132,7 +132,7 @@ class SystemPrompts:
   "融资轮次": "种子轮/A轮等具体轮次",
   "融资金额": "包含货币单位的金额",
   "投资方": "投资机构或个人名称",
-  "日期": "YYYY-MM-DD格式"
+  "日期": "从输入文本的'发布时间'字段提取日期，格式为YYYY-MM-DD，若无法提取则使用'未提供'"
 }
 ```
 
@@ -144,7 +144,8 @@ class SystemPrompts:
 5. 务必准确提取融资金额、轮次和投资方信息
 6. 保留重要专有名词的原文表示，如"OpenAI"
 7. 所有英文和数字前后都必须加空格提高可读性，例如"融资 1000 万美元"而非"融资1000万美元"
-8. 最终内容必须只返回JSON格式，不要有其他额外文本"""
+8. 务必从输入文本的"发布时间"字段提取日期，不要填写"未提供"除非原文确实没有日期
+9. 最终内容必须只返回JSON格式，不要有其他额外文本"""
     
     @staticmethod
     def get_default_prompt() -> str:
@@ -281,8 +282,8 @@ class TextUtils:
     @staticmethod
     def validate_cleaned_content(title: str, content: str) -> bool:
         """验证清洗后的内容是否符合要求"""
-        # 检查标题长度
-        if not title or len(title) < MIN_CLEAN_TITLE_LENGTH:
+        # 检查标题长度，降低要求为至少2个字符
+        if not title or len(title) < 2:
             logger.warning(f"标题长度不足: '{title}'")
             return False
             
@@ -732,12 +733,12 @@ class CrunchbaseDataProcessor(DataProcessor):
     def _process_crunchbase_item(self, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """处理单条Crunchbase数据"""
         try:
-            # 准备输入文本
+            # 准备输入文本，确保包含published_date字段
             input_text = (
                 f"文章标题: {item.get('title', '')}\n\n"
                 f"文章内容: {item.get('content', '')}\n\n"
                 f"作者: {item.get('author', '')}\n"
-                f"发布时间: {item.get('date_time', '')}\n"
+                f"发布时间: {item.get('published_date', item.get('date_time', ''))}\n"
                 f"URL: {item.get('url', '')}"
             )
             
@@ -785,11 +786,18 @@ class CrunchbaseDataProcessor(DataProcessor):
                         title = TextUtils.ensure_space_around_english_and_numbers(title)
                         content = TextUtils.ensure_space_around_english_and_numbers(content)
                         
+                        # 优先从文本解析结果中获取日期，如果为空或"未提供"则从原始数据中获取
+                        date_from_parsed = parsed_json.get('日期', '')
+                        if date_from_parsed and date_from_parsed != '未提供':
+                            date_time = date_from_parsed
+                        else:
+                            date_time = original_item.get('published_date', original_item.get('date_time', ''))
+                        
                         structured_data = {
                             'title': title,
                             'content': content,
                             'author': parsed_json.get('作者', parsed_json.get('author', '')),
-                            'date_time': parsed_json.get('日期', parsed_json.get('date_time', original_item.get('date_time', ''))),
+                            'date_time': date_time,
                             'source': 'crunchbase.com',
                             'source_url': original_item.get('url', ''),
                             'company': parsed_json.get('公司', parsed_json.get('company', '')),
@@ -874,12 +882,19 @@ class CrunchbaseDataProcessor(DataProcessor):
             title = TextUtils.ensure_space_around_english_and_numbers(parsed.get('title', ''))
             content = TextUtils.ensure_space_around_english_and_numbers(parsed.get('content', ''))
             
+            # 优先从文本解析结果中获取日期，如果为空或"未提供"则从原始数据中获取
+            date_from_parsed = parsed.get('date_time', '')
+            if date_from_parsed and date_from_parsed != '未提供':
+                date_time = date_from_parsed
+            else:
+                date_time = original_item.get('published_date', original_item.get('date_time', ''))
+            
             # 构建最终结构化数据
             structured_data = {
                 'title': title,
                 'content': content,
                 'author': parsed.get('author', original_item.get('author', '')),
-                'date_time': parsed.get('date_time', original_item.get('date_time', original_item.get('published_date', ''))),
+                'date_time': date_time,
                 'source': 'crunchbase.com',
                 'source_url': original_item.get('url', ''),
                 'company': parsed.get('company', '未提供'),
