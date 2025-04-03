@@ -16,13 +16,16 @@ body {
 
 header {
     background: url('/static/images/Title.png') no-repeat center center;
-    background-size: contain;
+    background-size: 100% auto;
     color: #ffffff;
     padding: 2.5rem 1rem;
     text-align: center;
     border-bottom: 5px solid #007bff;
     position: relative;
     min-height: 100px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .subtitle {
