@@ -501,13 +501,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // 只有当明确强制刷新或页面刷新时才强制获取新数据
         forceFetch = forceFetch || isPageRefresh;
         
-        console.log(`获取数据: sourceKey=${sourceKey}, source=${source}, page=${page}, forceFetch=${forceFetch}`);
-        
         // 获取状态参数
         const sourceState = state[sourceKey];
         const currentSource = sourceState.currentSource;
         const currentPage = sourceState.currentPage;
         const currentDatePage = sourceState.currentDatePage;
+        
+        console.log(`===== 数据请求开始 =====`);
+        console.log(`源: ${sourceKey}, 页面: ${currentPage}, 强制刷新: ${forceFetch}, 页面刷新: ${isPageRefresh}`);
         
         showLoading();
         hideError();
@@ -516,6 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 如果缓存开启且不是强制刷新，尝试从缓存获取数据
         if (CACHE_ENABLED && !forceFetch) {
             try {
+                console.log(`尝试从缓存中获取数据...`);
                 // 确保使用当前组件状态参数而不是函数参数
                 const cachedData = await cacheManager.getFromCache(
                     sourceKey, 
@@ -524,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
                 
                 if (cachedData) {
-                    console.log(`使用缓存数据 (${sourceKey}):`, cachedData);
+                    console.log(`✓ 成功从缓存获取数据`);
                     
                     if (cachedData.status === 'success') {
                         // 成功获取缓存数据，处理响应
@@ -569,13 +571,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         
                         hideLoading();
+                        console.log(`===== 数据请求结束 (使用缓存) =====`);
                         return; // 成功使用缓存数据，提前退出函数
                     }
                 }
+                console.log(`✗ 缓存未命中或无效，将从API获取数据`);
             } catch (error) {
                 console.error('从缓存获取数据失败:', error);
                 // 继续执行获取新数据的逻辑
             }
+        } else {
+            console.log(`跳过缓存: ${forceFetch ? '已强制刷新' : '缓存已禁用'}`);
         }
         
         // 没有缓存数据或强制刷新，发送API请求获取新数据
@@ -583,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const apiBaseUrl = USE_TEST_API ? TEST_API_URL : API_BASE_URL;
         const apiUrl = `${apiBaseUrl}?source=${currentSource}&page=${currentPage}${USE_TEST_API ? '&per_page=' + ARTICLES_PER_PAGE[sourceKey] : '&date_page=' + currentDatePage}`;
 
-        console.log(`请求数据 (${sourceKey}): ${apiUrl}`);
+        console.log(`从API请求数据: ${apiUrl}`);
 
         // 添加时间戳参数，确保浏览器请求新数据
         const timestamp = new Date().getTime();
@@ -602,18 +608,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(apiErrorMsg);
                 }
                 const data = await response.json();
-                console.log(`收到数据 (${sourceKey}):`, data);
+                console.log(`✓ 收到API数据响应:`, data);
 
                 // 缓存数据
                 if (CACHE_ENABLED && data.status === 'success') {
+                    console.log(`尝试保存数据到缓存...`);
                     // 使用当前的状态参数，不依赖dateRange
-                    cacheManager.saveToCache(
+                    const cacheSaved = await cacheManager.saveToCache(
                         sourceKey, 
                         currentSource, 
                         currentPage, 
                         null,  // 不再使用dateRange
                         data
                     );
+                    if (cacheSaved) {
+                        console.log(`✓ 成功保存数据到缓存`);
+                    } else {
+                        console.log(`✗ 保存数据到缓存失败`);
+                    }
                 }
 
                 if (data.status === 'success') {
@@ -622,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // 根据API端点不同处理不同的返回数据结构
                     if (USE_TEST_API) {
-                        // 测试API处理逻辑保持不变
+                        // 测试API处理逻辑
                         const defaultDateRange = {
                             start: '2025-03-01',
                             end: '2025-04-01'
@@ -656,6 +668,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         const totalArticlePages = data.total_in_date_range > 0 ? Math.ceil(data.total_in_date_range / ARTICLES_PER_PAGE[sourceKey]) : 0;
                         renderArticlePagination(sourceKey, currentPage, totalArticlePages);
                     }
+                    
+                    console.log(`===== 数据请求结束 (使用API数据) =====`);
                 } else {
                     throw new Error(data.message || 'API 返回错误状态');
                 }
@@ -870,62 +884,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 生成缓存键
         _generateCacheKey(sourceKey, source, page) {
-            // 简化缓存键逻辑，使用一个一致的格式
-            return `${sourceKey}_${source}_page${page}`; 
+            // 从IndexedDB中观察到实际的缓存键格式
+            if (USE_TEST_API) {
+                return `_${sourceKey}_${source}_all_page${page}`; // 与IndexedDB中的格式匹配
+            } else {
+                return `_${sourceKey}_${source}_page${page}`; // 未使用测试API时的格式
+            }
         }
         
         // 获取存储对象名称
         _getStoreName(sourceKey) {
             return sourceKey === 'x' ? 'xArticles' : 'crunchbaseArticles';
-        }
-        
-        // 将数据保存到缓存
-        async saveToCache(sourceKey, source, page, dateRange, data) {
-            if (!this.isInitialized || !CACHE_ENABLED) {
-                return false;
-            }
-            
-            // 使用相同的简化缓存键逻辑
-            const cacheKey = this._generateCacheKey(sourceKey, source, page);
-            const storeName = this._getStoreName(sourceKey);
-            
-            console.log(`保存缓存: ${cacheKey}`);
-            
-            // 决定缓存过期时间
-            let expiryTime = CACHE_EXPIRY.DEFAULT;
-            if (page === 1) {
-                expiryTime = CACHE_EXPIRY.HOME_PAGE; // 首页内容
-            } 
-            
-            const cacheItem = {
-                cacheKey,
-                data,
-                timestamp: Date.now(),
-                lastAccessed: Date.now(),
-                expiryTime,
-                size: JSON.stringify(data).length
-            };
-            
-            try {
-                return new Promise((resolve, reject) => {
-                    const transaction = this.db.transaction([storeName], 'readwrite');
-                    const store = transaction.objectStore(storeName);
-                    const request = store.put(cacheItem);
-                    
-                    request.onsuccess = () => {
-                        console.log(`已缓存: ${cacheKey}`);
-                        resolve(true);
-                    };
-                    
-                    request.onerror = (event) => {
-                        console.error(`缓存失败: ${cacheKey}`, event.target.error);
-                        resolve(false);
-                    };
-                });
-            } catch (error) {
-                console.error('保存数据到缓存时出错:', error);
-                return false;
-            }
         }
         
         // 从缓存获取数据
@@ -934,46 +903,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 return null;
             }
             
-            // 使用相同的简化缓存键逻辑
-            const cacheKey = this._generateCacheKey(sourceKey, source, page);
+            const perPage = ARTICLES_PER_PAGE[sourceKey];
+            // 生成与实际请求URL匹配的键
+            const normalKey = this._generateCacheKey(sourceKey, source, page);
+            // 尝试带all和不带all的两种可能格式
+            const allKey = `_${sourceKey}_${source}_all_page${page}`;
+            const simpleKey = `_${sourceKey}_${source}_page${page}`;
+            
             const storeName = this._getStoreName(sourceKey);
             
-            console.log(`尝试从缓存获取数据: ${cacheKey}`);
+            console.log(`尝试所有可能的缓存键: [${normalKey}, ${allKey}, ${simpleKey}]`);
+            
+            // 尝试所有可能的缓存键格式
+            const keysToTry = [normalKey];
+            if (normalKey !== allKey) keysToTry.push(allKey);
+            if (normalKey !== simpleKey) keysToTry.push(simpleKey);
             
             try {
-                return new Promise((resolve, reject) => {
+                // 尝试所有可能的键，直到找到一个匹配的
+                for (const cacheKey of keysToTry) {
+                    console.log(`尝试缓存键: ${cacheKey}`);
+                    
                     const transaction = this.db.transaction([storeName], 'readonly');
                     const store = transaction.objectStore(storeName);
-                    const request = store.get(cacheKey);
                     
-                    request.onsuccess = (event) => {
-                        const cachedData = event.target.result;
+                    const cachedData = await new Promise((resolve) => {
+                        const request = store.get(cacheKey);
+                        request.onsuccess = (event) => {
+                            resolve(event.target.result);
+                        };
+                        request.onerror = () => {
+                            resolve(null);
+                        };
+                    });
+                    
+                    if (cachedData) {
+                        console.log(`命中缓存: ${cacheKey}`);
                         
-                        // 检查缓存是否存在且未过期
-                        if (cachedData && Date.now() - cachedData.timestamp < cachedData.expiryTime) {
-                            console.log(`命中缓存: ${cacheKey}`);
-                            
+                        // 检查缓存是否过期
+                        if (Date.now() - cachedData.timestamp < cachedData.expiryTime) {
                             // 更新缓存访问时间戳，用于LRU策略
                             this._updateAccessTimestamp(sourceKey, cacheKey);
-                            
-                            resolve(cachedData.data);
+                            return cachedData.data;
                         } else {
-                            if (cachedData) {
-                                console.log(`缓存已过期: ${cacheKey}`);
-                                // 删除过期缓存
-                                this._removeFromCache(sourceKey, cacheKey);
-                            } else {
-                                console.log(`缓存未命中: ${cacheKey}`);
-                            }
-                            resolve(null);
+                            console.log(`缓存已过期: ${cacheKey}`);
+                            // 删除过期缓存
+                            this._removeFromCache(sourceKey, cacheKey);
                         }
-                    };
-                    
-                    request.onerror = (event) => {
-                        console.error(`读取缓存失败: ${cacheKey}`, event.target.error);
-                        resolve(null);
-                    };
-                });
+                    }
+                }
+                
+                console.log('所有缓存键尝试均未命中');
+                return null;
             } catch (error) {
                 console.error('从缓存获取数据时出错:', error);
                 return null;
@@ -1079,6 +1060,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (error) {
                     console.error(`清空${storeName}缓存失败:`, error);
                 }
+            }
+        }
+
+        // 将数据保存到缓存
+        async saveToCache(sourceKey, source, page, dateRange, data) {
+            if (!this.isInitialized || !CACHE_ENABLED) {
+                return false;
+            }
+            
+            // 使用正确的缓存键格式
+            const cacheKey = this._generateCacheKey(sourceKey, source, page);
+            const storeName = this._getStoreName(sourceKey);
+            
+            console.log(`保存缓存: ${cacheKey}`);
+            
+            // 决定缓存过期时间
+            let expiryTime = CACHE_EXPIRY.DEFAULT;
+            if (page === 1) {
+                expiryTime = CACHE_EXPIRY.HOME_PAGE; // 首页内容
+            } 
+            
+            const cacheItem = {
+                cacheKey,
+                data,
+                timestamp: Date.now(),
+                lastAccessed: Date.now(),
+                expiryTime,
+                size: JSON.stringify(data).length
+            };
+            
+            try {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.put(cacheItem);
+                    
+                    request.onsuccess = () => {
+                        console.log(`已缓存: ${cacheKey}`);
+                        resolve(true);
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error(`缓存失败: ${cacheKey}`, event.target.error);
+                        resolve(false);
+                    };
+                });
+            } catch (error) {
+                console.error('保存数据到缓存时出错:', error);
+                return false;
             }
         }
     }
