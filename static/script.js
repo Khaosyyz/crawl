@@ -496,11 +496,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // 检查是否是页面刷新或首次加载
         const isPageRefresh = window.performance && 
                               window.performance.navigation && 
-                              (window.performance.navigation.type === 1 || // 刷新
-                               window.performance.navigation.type === 0);  // 首次加载
+                              (window.performance.navigation.type === 1); // 只检查刷新(1)，不检查首次加载(0)
         
-        // 如果是页面刷新或首次加载，强制获取新数据
+        // 只有当明确强制刷新或页面刷新时才强制获取新数据
         forceFetch = forceFetch || isPageRefresh;
+        
+        console.log(`获取数据: sourceKey=${sourceKey}, forceFetch=${forceFetch}, isPageRefresh=${isPageRefresh}`);
         
         // 获取状态参数
         const sourceState = state[sourceKey];
@@ -516,6 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 如果缓存开启且不是强制刷新，尝试从缓存获取数据
         if (CACHE_ENABLED && !forceFetch) {
             try {
+                const cacheKey = `${sourceKey}_${currentSource}_${currentPage}_${currentDatePage}`;
+                console.log(`尝试从缓存获取数据: ${cacheKey}`);
+                
                 const cachedData = await cacheManager.getFromCache(
                     sourceKey, 
                     currentSource, 
@@ -704,8 +708,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // 更新当前活动源
         state.activeSource = contentId.split('-')[0]; // 'x-content' -> 'x'
         
-        // 加载对应数据
-        fetchArticles(state.activeSource);
+        // 加载对应数据 - 明确指定不强制刷新，使用缓存
+        fetchArticles(state.activeSource, null, null, null, false);
     }
 
     // --- 事件监听器设置 ---
@@ -720,7 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!prevDateBtn.disabled) {
                         state[sourceKey].currentDatePage--;
                         state[sourceKey].currentPage = 1; // 重置文章页码
-                        fetchArticles(sourceKey);
+                        fetchArticles(sourceKey, null, null, null, false);
                     }
                 });
             }
@@ -730,7 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!nextDateBtn.disabled) {
                         state[sourceKey].currentDatePage++;
                         state[sourceKey].currentPage = 1; // 重置文章页码
-                        fetchArticles(sourceKey);
+                        fetchArticles(sourceKey, null, null, null, false);
                     }
                 });
             }
@@ -747,7 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          // 只有当页码改变时才执行
                          if (!isNaN(newPage) && newPage !== state[sourceKey].currentPage) {
                              state[sourceKey].currentPage = newPage;
-                             fetchArticles(sourceKey);
+                             fetchArticles(sourceKey, null, null, null, false);
                              // 可选：滚动到文章区域顶部
                              elements[sourceKey].contentDiv.scrollIntoView({ behavior: 'smooth' });
                          }
@@ -755,16 +759,6 @@ document.addEventListener('DOMContentLoaded', () => {
                  });
             }
         });
-
-        // 刷新按钮监听器
-        const refreshButton = document.getElementById('refresh-button');
-        if (refreshButton) {
-            refreshButton.addEventListener('click', () => {
-                // 强制刷新当前活动标签页的数据
-                fetchArticles(state.activeSource, null, null, null, true);
-                console.log(`手动刷新 ${state.activeSource} 数据`);
-            });
-        }
 
         // 新增："显示更多"/"收起" 按钮监听器 (使用事件委托)
         document.addEventListener('click', (event) => {
