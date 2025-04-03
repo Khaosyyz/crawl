@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="date"><i class="fas fa-calendar-alt"></i> ${date}</span>
                 </div>
             </div>
-            <div class="news-card-content content-collapsible ${isLongContent ? 'collapsed' : ''}">
+            <div class="news-card-content content-collapsible ${isLongContent ? 'collapsed' : ''}" style="white-space: pre-line;">
                 <p>${content}</p>
                 ${isLongContent ? '<div class="content-fade-button">展开</div>' : ''}
             </div>
@@ -335,9 +335,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
          if (!articles || articles.length === 0) {
             container.innerHTML = '<p class="no-articles">当前日期范围内没有找到资讯。</p>';
-            return;
-        }
-        
+                        return;
+                    }
+                    
         const groupContainer = document.createElement('div');
         groupContainer.className = 'news-group crunchbase-group';
         container.appendChild(groupContainer);
@@ -504,73 +504,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log(`请求数据 (${sourceKey}): ${apiUrl}`);
 
-        // 尝试从缓存获取数据
-        if (CACHE_ENABLED) {
-            try {
-                // 生成当前视图的缓存键参数
-                const cacheDateRange = USE_TEST_API ? null : state[sourceKey].dateRange;
-                const cacheSource = sourceState.currentSource;
-                const cachePage = sourceState.currentPage;
-                
-                console.log('尝试从缓存获取数据:', sourceKey, cacheSource, cachePage, cacheDateRange);
-                const cachedData = await cacheManager.getFromCache(
-                    sourceKey, 
-                    cacheSource, 
-                    cachePage, 
-                    cacheDateRange
-                );
-                
-                if (cachedData) {
-                    console.log('使用缓存数据');
-                    
-                    // 处理缓存数据，逻辑与API响应处理相同
-                    if (cachedData.status === 'success') {
-                        // 根据API端点不同处理不同的返回数据结构
-                        if (USE_TEST_API) {
-                            // 测试API处理逻辑
-                            const defaultDateRange = {
-                                start: '2025-03-01',
-                                end: '2025-04-01'
-                            };
-                            updateDateInfo(sourceKey, defaultDateRange, 1, 1);
-                            updateDatePaginationButtons(sourceKey, 1, 1);
-                            
-                            // 调用实际的渲染函数
-                            if (sourceKey === 'x') {
-                                renderXArticles(cachedData.data, sourceKey);
-                            } else {
-                                renderCrunchbaseArticles(cachedData.data, sourceKey);
-                            }
-                            
-                            // 渲染文章分页
-                            const totalArticlePages = cachedData.total > 0 ? Math.ceil(cachedData.total / ARTICLES_PER_PAGE[sourceKey]) : 0;
-                            renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
-                } else {
-                            // 原始API处理逻辑
-                            updateDateInfo(sourceKey, cachedData.date_range, sourceState.currentDatePage, cachedData.total_date_pages);
-                            updateDatePaginationButtons(sourceKey, sourceState.currentDatePage, cachedData.total_date_pages);
-
-                            // 调用实际的渲染函数
-                            if (sourceKey === 'x') {
-                                renderXArticles(cachedData.data, sourceKey);
-                            } else {
-                                renderCrunchbaseArticles(cachedData.data, sourceKey);
-                            }
-
-                            // 渲染文章分页
-                            const totalArticlePages = cachedData.total_in_date_range > 0 ? Math.ceil(cachedData.total_in_date_range / ARTICLES_PER_PAGE[sourceKey]) : 0;
-                            renderArticlePagination(sourceKey, sourceState.currentPage, totalArticlePages);
-                        }
-                        
-                        hideLoading();
-                        return; // 使用缓存数据后直接返回
-                    }
-                    }
-                } catch (error) {
-                console.error('读取缓存失败:', error);
-                // 缓存读取失败，继续使用API获取数据
-            }
-        }
+        // 添加时间戳参数，确保浏览器请求新数据
+        const timestamp = new Date().getTime();
+        const refreshedApiUrl = `${apiUrl}&_=${timestamp}`;
 
         // 最大重试次数
         const maxRetries = 2;
@@ -579,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         while (retryCount <= maxRetries && !success) {
             try {
-                const response = await fetch(apiUrl);
+                const response = await fetch(refreshedApiUrl);
                 if (!response.ok) {
                     let apiErrorMsg = `HTTP 错误! 状态: ${response.status}`;
                     throw new Error(apiErrorMsg);
@@ -648,11 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 如果达到最大重试次数，显示错误
                 if (retryCount > maxRetries) {
-                    showError(`获取数据失败，请稍后再试或检查API服务状态。Failed to fetch`);
-                    if (errorMessageDiv) errorMessageDiv.style.display = 'block';
-            } else {
-                    // 否则，等待一段时间后重试
-                    await new Promise(resolve => setTimeout(resolve, 800 * retryCount)); // 重试延迟时间递增
+                    showError(`获取数据失败: ${error.message}`);
                 }
             }
         }

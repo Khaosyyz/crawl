@@ -1,5 +1,6 @@
 # Web服务和API
-Flask==3.0.2
+fastapi==0.104.1
+uvicorn==0.23.2
 Werkzeug>=3.0.0
 flask-cors==4.0.0
 
@@ -19,6 +20,7 @@ schedule==1.2.0
 
 # 其他工具库
 setuptools>=65.5.1
+argparse>=1.4.0
 
 # 数据库相关
 pymongo==4.6.2

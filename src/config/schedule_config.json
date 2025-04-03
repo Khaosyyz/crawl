@@ -1,0 +1,16 @@
+{
+    "crawler": {
+        "x": {
+            "interval": "3h",
+            "enabled": true
+        },
+        "crunchbase": {
+            "interval": "12h",
+            "enabled": true
+        }
+    },
+    "cleaner": {
+        "interval": "1m",
+        "enabled": true
+    }
+}
