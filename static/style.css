@@ -29,11 +29,11 @@ header {
 }
 
 .title-image img {
-    max-width: 300px;
-    width: 40%;
+    max-width: 500px;
+    width: 70%;
     height: auto;
     display: inline-block;
-    min-width: 200px;
+    min-width: 300px;
 }
 
 .subtitle {
