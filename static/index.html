@@ -23,23 +23,23 @@
         <!-- Tab Container -->
         <div class="tab-container">
             <button class="tab-link active" onclick="openSource(event, 'x-content')">
-                <i class="fab fa-xing"></i> X - 高价值信息源
+                <img src="/static/images/X_logo_dark.png" alt="X Logo" class="tab-logo x-logo"> X - 高价值信息源
             </button>
             <button class="tab-link" onclick="openSource(event, 'crunchbase-content')">
-                <i class="fas fa-chart-line"></i> Crunchbase - 市场投资机会
+                <img src="/static/images/Crunchbase_logo_light.png" alt="Crunchbase Logo" class="tab-logo cb-logo"> Crunchbase - 市场投资机会
             </button>
         </div>
 
         <!-- Tab Content -->
         <div id="x-content" class="tab-content" style="display: block;">
-            <h2><i class="fab fa-xing"></i> 来自 X 的最新资讯</h2>
+            <h2><img src="/static/images/X_logo_light.png" alt="X Logo" class="content-logo x-logo"> 来自 X 的最新资讯</h2>
             <div id="articles-x"></div>
             <!-- X specific pagination for articles within date range will be added by JS -->
             <div id="pagination-x" class="pagination"></div>
         </div>
 
         <div id="crunchbase-content" class="tab-content" style="display: none;">
-            <h2><i class="fas fa-chart-line"></i> 来自 Crunchbase 的投融资动态</h2>
+            <h2><img src="/static/images/Crunchbase_logo_light.png" alt="Crunchbase Logo" class="content-logo cb-logo"> 来自 Crunchbase 的投融资动态</h2>
             <div id="articles-crunchbase"></div>
             <!-- Crunchbase specific pagination for articles within date range will be added by JS -->
             <div id="pagination-crunchbase" class="pagination"></div>

@@ -687,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideLoading();
     }
 
-    // --- Tab 切换逻辑 --- (无变化)
+    // --- Tab 切换逻辑 --- (更新logo显示)
     window.openSource = function(event, contentId) {
         // 阻止默认事件
         if (event) event.preventDefault();
@@ -700,6 +700,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // 移除所有标签链接的活动类
         tabLinks.forEach(link => {
             link.classList.remove('active');
+            
+            // 重置所有标签的logo为light版本（非活动状态）
+            const xLogo = link.querySelector('.x-logo');
+            if (xLogo) {
+                xLogo.src = '/static/images/X_logo_light.png';
+            }
         });
         
         // 显示当前标签内容
@@ -709,10 +715,24 @@ document.addEventListener('DOMContentLoaded', () => {
         // 添加活动类到当前标签链接
         if (event) {
             event.currentTarget.classList.add('active');
-            } else {
+            
+            // 设置活动标签的X logo为dark版本（活动状态）
+            const xLogo = event.currentTarget.querySelector('.x-logo');
+            if (xLogo) {
+                xLogo.src = '/static/images/X_logo_dark.png';
+            }
+        } else {
             // 初始化调用时没有事件对象
             const linkForContent = document.querySelector(`[onclick*="${contentId}"]`);
-            if (linkForContent) linkForContent.classList.add('active');
+            if (linkForContent) {
+                linkForContent.classList.add('active');
+                
+                // 设置活动标签的X logo为dark版本（活动状态）
+                const xLogo = linkForContent.querySelector('.x-logo');
+                if (xLogo) {
+                    xLogo.src = '/static/images/X_logo_dark.png';
+                }
+            }
         }
         
         // 更新当前活动源
