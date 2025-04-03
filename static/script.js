@@ -501,14 +501,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // 只有当明确强制刷新或页面刷新时才强制获取新数据
         forceFetch = forceFetch || isPageRefresh;
         
-        console.log(`获取数据: sourceKey=${sourceKey}, forceFetch=${forceFetch}, isPageRefresh=${isPageRefresh}`);
+        console.log(`获取数据: sourceKey=${sourceKey}, source=${source}, page=${page}, forceFetch=${forceFetch}`);
         
         // 获取状态参数
         const sourceState = state[sourceKey];
         const currentSource = sourceState.currentSource;
         const currentPage = sourceState.currentPage;
         const currentDatePage = sourceState.currentDatePage;
-        const cacheDateRange = dateRange || (USE_TEST_API ? null : { start: 'current', end: 'current' });
         
         showLoading();
         hideError();
@@ -517,14 +516,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // 如果缓存开启且不是强制刷新，尝试从缓存获取数据
         if (CACHE_ENABLED && !forceFetch) {
             try {
-                const cacheKey = `${sourceKey}_${currentSource}_${currentPage}_${currentDatePage}`;
-                console.log(`尝试从缓存获取数据: ${cacheKey}`);
-                
+                // 确保使用当前组件状态参数而不是函数参数
                 const cachedData = await cacheManager.getFromCache(
                     sourceKey, 
                     currentSource, 
-                    currentPage, 
-                    cacheDateRange
+                    currentPage
                 );
                 
                 if (cachedData) {
@@ -610,12 +606,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 缓存数据
                 if (CACHE_ENABLED && data.status === 'success') {
-                    const cacheDateRange = USE_TEST_API ? null : data.date_range;
+                    // 使用当前的状态参数，不依赖dateRange
                     cacheManager.saveToCache(
                         sourceKey, 
                         currentSource, 
                         currentPage, 
-                        cacheDateRange, 
+                        null,  // 不再使用dateRange
                         data
                     );
                 }
@@ -724,7 +720,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!prevDateBtn.disabled) {
                         state[sourceKey].currentDatePage--;
                         state[sourceKey].currentPage = 1; // 重置文章页码
-                        fetchArticles(sourceKey, null, null, null, false);
+                        // 日期切换需要向API发出新请求
+                        fetchArticles(sourceKey, null, null, null, true);
                     }
                 });
             }
@@ -734,7 +731,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!nextDateBtn.disabled) {
                         state[sourceKey].currentDatePage++;
                         state[sourceKey].currentPage = 1; // 重置文章页码
-                        fetchArticles(sourceKey, null, null, null, false);
+                        // 日期切换需要向API发出新请求
+                        fetchArticles(sourceKey, null, null, null, true);
                     }
                 });
             }
@@ -751,6 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          // 只有当页码改变时才执行
                          if (!isNaN(newPage) && newPage !== state[sourceKey].currentPage) {
                              state[sourceKey].currentPage = newPage;
+                             // 同一日期内的页面切换优先使用缓存
                              fetchArticles(sourceKey, null, null, null, false);
                              // 可选：滚动到文章区域顶部
                              elements[sourceKey].contentDiv.scrollIntoView({ behavior: 'smooth' });
@@ -870,9 +869,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // 生成缓存键
-        _generateCacheKey(sourceKey, source, page, dateRange) {
-            const dateStr = dateRange ? `${dateRange.start}_${dateRange.end}` : 'all';
-            return `${sourceKey}_${source}_${dateStr}_page${page}`;
+        _generateCacheKey(sourceKey, source, page) {
+            // 简化缓存键逻辑，使用一个一致的格式
+            return `${sourceKey}_${source}_page${page}`; 
         }
         
         // 获取存储对象名称
@@ -880,14 +879,66 @@ document.addEventListener('DOMContentLoaded', () => {
             return sourceKey === 'x' ? 'xArticles' : 'crunchbaseArticles';
         }
         
+        // 将数据保存到缓存
+        async saveToCache(sourceKey, source, page, dateRange, data) {
+            if (!this.isInitialized || !CACHE_ENABLED) {
+                return false;
+            }
+            
+            // 使用相同的简化缓存键逻辑
+            const cacheKey = this._generateCacheKey(sourceKey, source, page);
+            const storeName = this._getStoreName(sourceKey);
+            
+            console.log(`保存缓存: ${cacheKey}`);
+            
+            // 决定缓存过期时间
+            let expiryTime = CACHE_EXPIRY.DEFAULT;
+            if (page === 1) {
+                expiryTime = CACHE_EXPIRY.HOME_PAGE; // 首页内容
+            } 
+            
+            const cacheItem = {
+                cacheKey,
+                data,
+                timestamp: Date.now(),
+                lastAccessed: Date.now(),
+                expiryTime,
+                size: JSON.stringify(data).length
+            };
+            
+            try {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.put(cacheItem);
+                    
+                    request.onsuccess = () => {
+                        console.log(`已缓存: ${cacheKey}`);
+                        resolve(true);
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error(`缓存失败: ${cacheKey}`, event.target.error);
+                        resolve(false);
+                    };
+                });
+            } catch (error) {
+                console.error('保存数据到缓存时出错:', error);
+                return false;
+            }
+        }
+        
         // 从缓存获取数据
-        async getFromCache(sourceKey, source, page, dateRange) {
+        async getFromCache(sourceKey, source, page) {
             if (!this.isInitialized || !CACHE_ENABLED) {
                 return null;
             }
             
-            const cacheKey = this._generateCacheKey(sourceKey, source, page, dateRange);
+            // 使用相同的简化缓存键逻辑
+            const cacheKey = this._generateCacheKey(sourceKey, source, page);
             const storeName = this._getStoreName(sourceKey);
+            
+            console.log(`尝试从缓存获取数据: ${cacheKey}`);
             
             try {
                 return new Promise((resolve, reject) => {
@@ -926,54 +977,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error('从缓存获取数据时出错:', error);
                 return null;
-            }
-        }
-        
-        // 将数据保存到缓存
-        async saveToCache(sourceKey, source, page, dateRange, data) {
-            if (!this.isInitialized || !CACHE_ENABLED) {
-                return false;
-            }
-            
-            const cacheKey = this._generateCacheKey(sourceKey, source, page, dateRange);
-            const storeName = this._getStoreName(sourceKey);
-            
-            // 决定缓存过期时间
-            let expiryTime = CACHE_EXPIRY.DEFAULT;
-            if (page === 1 && (!dateRange || this._isRecentDate(dateRange))) {
-                expiryTime = CACHE_EXPIRY.HOME_PAGE; // 首页/最新内容
-            } else if (dateRange && this._isOldDate(dateRange)) {
-                expiryTime = CACHE_EXPIRY.ARCHIVE; // 归档内容
-            }
-            
-            const cacheItem = {
-                cacheKey,
-                data,
-                timestamp: Date.now(),
-                lastAccessed: Date.now(),
-                expiryTime,
-                size: JSON.stringify(data).length
-            };
-            
-            try {
-                return new Promise((resolve, reject) => {
-                    const transaction = this.db.transaction([storeName], 'readwrite');
-                    const store = transaction.objectStore(storeName);
-                    const request = store.put(cacheItem);
-                    
-                    request.onsuccess = () => {
-                        console.log(`已缓存: ${cacheKey}`);
-                        resolve(true);
-                    };
-                    
-                    request.onerror = (event) => {
-                        console.error(`缓存失败: ${cacheKey}`, event.target.error);
-                        resolve(false);
-                    };
-                });
-            } catch (error) {
-                console.error('保存数据到缓存时出错:', error);
-                return false;
             }
         }
         
@@ -1051,24 +1054,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 判断是否为最近日期范围
         _isRecentDate(dateRange) {
-            if (!dateRange || !dateRange.start) return false;
-            
-            const startDate = new Date(dateRange.start);
-            const now = new Date();
-            const daysDiff = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
-            
-            return daysDiff <= 7; // 最近7天内的内容
+            // 简化版本
+            return true;
         }
         
         // 判断是否为较早日期范围
         _isOldDate(dateRange) {
-            if (!dateRange || !dateRange.start) return false;
-            
-            const startDate = new Date(dateRange.start);
-            const now = new Date();
-            const daysDiff = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
-            
-            return daysDiff >= 30; // 30天前的内容
+            // 简化版本
+            return false;
         }
         
         // 清空所有缓存
