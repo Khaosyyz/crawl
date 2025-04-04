@@ -58,6 +58,13 @@ def start_cleaner():
             logger.info("没有需要处理的数据，清洗流程结束")
             return True
         
+        # 创建数据存储实例 - 批量处理模式
+        from src.clean.storage import DataStorage
+        storage = DataStorage()
+        
+        # 用于收集清洗成功的数据
+        cleaned_data_list = []
+        
         # 处理每条数据
         processed = 0
         failed = 0
@@ -103,7 +110,7 @@ def start_cleaner():
                         logger.error(traceback.format_exc())
                         result = None
                 
-                # 更新处理后的数据到数据库
+                # 收集处理后的数据，等待批量保存
                 if result:
                     # 确保清洗后的数据包含源URL
                     if 'source_url' not in result and source_url:
@@ -113,14 +120,10 @@ def start_cleaner():
                     if 'source' not in result:
                         result['source'] = source
                     
-                    # 保存到数据库
-                    success = update_processed_data(source_url, result)
-                    if success:
-                        processed += 1
-                        logger.info(f"成功处理并保存数据: {source_url}")
-                    else:
-                        failed += 1
-                        logger.warning(f"处理数据成功但保存失败: {source_url}")
+                    # 添加到批量保存列表
+                    cleaned_data_list.append(result)
+                    processed += 1
+                    logger.info(f"成功处理数据: {source_url}")
                 else:
                     failed += 1
                     logger.warning(f"处理数据失败: {source_url}")
@@ -134,8 +137,15 @@ def start_cleaner():
                 logger.error(traceback.format_exc())
                 continue
         
+        # 批量保存所有处理好的数据
+        saved_count = 0
+        if cleaned_data_list:
+            logger.info(f"开始批量保存 {len(cleaned_data_list)} 条处理后的数据...")
+            saved_count = storage.save_articles(cleaned_data_list)
+            logger.info(f"批量保存完成，成功保存 {saved_count} 条数据")
+        
         # 输出处理结果
-        logger.info(f"数据清洗完成: 总计 {total} 条, 成功 {processed} 条, 失败 {failed} 条")
+        logger.info(f"数据清洗完成: 总计 {total} 条, 成功处理 {processed} 条, 失败 {failed} 条, 成功保存 {saved_count} 条")
         
         # 清空临时文件
         if processed > 0:
