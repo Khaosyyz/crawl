@@ -12,5 +12,9 @@
     "cleaner": {
         "interval": "1m",
         "enabled": true
+    },
+    "logs_cleaner": {
+        "interval": "24h",
+        "enabled": true
     }
 }

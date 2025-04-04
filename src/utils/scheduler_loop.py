@@ -84,6 +84,10 @@ def run_cleaner():
     """运行数据清洗"""
     return run_task("数据清洗", "src.clean.cleaner", "start_cleaner")
 
+def run_logs_cleaner():
+    """运行日志清理"""
+    return run_task("日志清理", "logs.clean_logs", "start_logs_cleaner")
+
 def schedule_job(name, task_func, interval_str):
     """安排定时任务，使用间隔时间"""
     # 解析间隔时间字符串
@@ -134,6 +138,14 @@ def setup_schedule(config):
         schedule_job("cleaner", run_cleaner, interval)
         # 首次运行
         run_cleaner()
+    
+    # 设置日志清理调度
+    logs_cleaner_config = config.get("logs_cleaner", {})
+    if logs_cleaner_config.get("enabled", False):
+        interval = logs_cleaner_config.get("interval", "24h")
+        schedule_job("logs_cleaner", run_logs_cleaner, interval)
+        # 首次运行
+        run_logs_cleaner()
     
     logger.info("调度任务设置完成")
 
