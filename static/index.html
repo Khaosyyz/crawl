@@ -22,6 +22,9 @@
     <main>
         <!-- Tab Container -->
         <div class="tab-container">
+            <button class="tab-link" onclick="openSource(event, 'hotnews-content')">
+                <i class="fas fa-newspaper tab-icon hotnews-icon"></i> 每日快报 - 热点资讯分析
+            </button>
             <button class="tab-link active" onclick="openSource(event, 'x-content')">
                 <img src="/static/images/X_logo_dark.png" alt="X Logo" class="tab-logo x-logo"> X - 高价值信息源
             </button>
@@ -31,6 +34,13 @@
         </div>
 
         <!-- Tab Content -->
+        <div id="hotnews-content" class="tab-content" style="display: none;">
+            <h2><i class="fas fa-newspaper content-icon hotnews-icon"></i> 每日AI资讯快报</h2>
+            <div id="articles-hotnews"></div>
+            <!-- HotNews specific pagination for articles within date range will be added by JS -->
+            <div id="pagination-hotnews" class="pagination"></div>
+        </div>
+
         <div id="x-content" class="tab-content" style="display: block;">
             <h2><img src="/static/images/X_logo_light.png" alt="X Logo" class="content-logo x-logo"> 来自 X 的最新资讯</h2>
             <div id="articles-x"></div>

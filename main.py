@@ -29,9 +29,9 @@ def parse_args():
     parser.add_argument("command", choices=["start", "stop", "status", "crawl", "clean"], 
                       help="命令: start-启动所有服务, stop-停止所有服务, status-查看状态, crawl-仅爬虫, clean-仅清洗")
     parser.add_argument("--crawler", type=str, 
-                      choices=["x", "crunchbase", "all"], 
+                      choices=["x", "crunchbase", "hotnews", "all"], 
                       default="all", 
-                      help="选择爬虫: x, crunchbase, all")
+                      help="选择爬虫: x, crunchbase, hotnews, all")
     return parser.parse_args()
 
 def save_pid(service_name, pid):

@@ -1,0 +1,11 @@
+# 每日快报爬虫定时任务
+# 每天上午10点运行HotNews爬虫
+
+# 项目根目录
+PROJECT_ROOT=/Users/syyz/PycharmProjects/craw
+
+# 每天上午10点执行
+0 10 * * * cd $PROJECT_ROOT && ./launch.sh crawler hotnews >> $PROJECT_ROOT/logs/hotnews_cron.log 2>&1
+
+# 注意: 使用以下命令将此文件添加到crontab中:
+# crontab hotnews_cron 

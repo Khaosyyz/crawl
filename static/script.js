@@ -3,14 +3,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = {
         x: { currentPage: 1, currentDatePage: 1, currentSource: 'x.com' },
         crunchbase: { currentPage: 1, currentDatePage: 1, currentSource: 'crunchbase.com' }, // 数据库中实际存储的源ID
-        activeSource: 'x' // 'x' or 'crunchbase'
+        hotnews: { currentPage: 1, currentDatePage: 1, currentSource: 'hotnews' }, // 新增每日快报源
+        activeSource: 'hotnews' // 将默认标签页改为'hotnews'
     };
 
     // --- Constants ---
     const API_BASE_URL = '/api/articles'; // 使用相对路径，指向 Vercel 上的 API
     const TEST_API_URL = '/api/all-articles'; // 测试API端点，不进行日期过滤
     const USE_TEST_API = true; // 保持使用测试API端点
-    const ARTICLES_PER_PAGE = { x: 9, crunchbase: 3 }; // Different sources per page articles
+    const ARTICLES_PER_PAGE = { x: 9, crunchbase: 3, hotnews: 3 }; // Different sources per page articles
 
     // 缓存配置
     const CACHE_ENABLED = true; // 全局缓存开关
@@ -45,6 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
             prevDateBtn: document.getElementById('prev-date-page-crunchbase'), // Previous date page button
             nextDateBtn: document.getElementById('next-date-page-crunchbase'), // Next date page button
             dateInfo: document.getElementById('date-page-info-crunchbase') // Date information display
+        },
+        hotnews: {
+            container: document.getElementById('articles-hotnews'),
+            contentDiv: document.getElementById('hotnews-content'),
+            pagination: document.getElementById('pagination-hotnews'), // Article pagination container
+            prevDateBtn: document.getElementById('prev-date-page-hotnews'), // Previous date page button (if needed)
+            nextDateBtn: document.getElementById('next-date-page-hotnews'), // Next date page button (if needed)
+            dateInfo: document.getElementById('date-page-info-hotnews') // Date information display
         }
     };
 
@@ -238,6 +247,62 @@ document.addEventListener('DOMContentLoaded', () => {
         return card;
     }
 
+    function createHotNewsCard(article) {
+        const card = document.createElement('div');
+        card.className = 'news-card hotnews-card';
+
+        const title = article.title || '无标题';
+        let content = article.content || '无内容';
+        const date = article.date_time ? article.date_time.substring(0, 16) : '未知日期'; // 保留时间部分
+
+        // 是否需要显示完整内容，大于300字符的内容将被截断
+        const isLongContent = content.length > 300;
+        const truncatedContent = isLongContent ? content.substring(0, 300) + '...' : content;
+
+        // 处理链接
+        content = content.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        card.innerHTML = `
+            <div class="news-card-header">
+                <h3 class="news-title">${title}</h3>
+                <div class="news-date"><i class="fas fa-calendar-alt"></i> ${date}</div>
+            </div>
+            <div class="news-card-content">
+                <div class="news-summary">${truncatedContent}</div>
+                ${isLongContent ? `
+                <div class="news-full-content" style="display: none;">${content}</div>
+                <div class="hotnews-button-container">
+                    <button class="show-more-btn" data-action="show-more"><i class="fas fa-chevron-down"></i> 展开全文</button>
+                    <button class="collapse-btn" style="display: none;" data-action="collapse"><i class="fas fa-chevron-up"></i> 收起</button>
+                </div>` : ''}
+            </div>
+        `;
+
+        // 添加展开/收起事件监听器
+        if (isLongContent) {
+            const showMoreBtn = card.querySelector('.show-more-btn');
+            const collapseBtn = card.querySelector('.collapse-btn');
+            const summary = card.querySelector('.news-summary');
+            const fullContent = card.querySelector('.news-full-content');
+
+            showMoreBtn.addEventListener('click', () => {
+                summary.style.display = 'none';
+                fullContent.style.display = 'block';
+                showMoreBtn.style.display = 'none';
+                collapseBtn.style.display = 'inline-flex';
+            });
+
+            collapseBtn.addEventListener('click', () => {
+                summary.style.display = 'block';
+                fullContent.style.display = 'none';
+                showMoreBtn.style.display = 'inline-flex';
+                collapseBtn.style.display = 'none';
+            });
+        }
+
+        return card;
+    }
+
     // --- 数字格式化辅助函数 ---
     function formatNumber(num) {
         if (typeof num !== 'number') return num; // 或返回 '0' 或 '-'
@@ -384,6 +449,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
             extraCardsContainer.after(buttonContainer);
         }
+    }
+
+    function renderHotNewsArticles(articles, sourceKey) {
+        const container = elements[sourceKey].container;
+        if (!container) return;
+        
+        // 清空容器
+        container.innerHTML = '';
+        
+        if (!articles || articles.length === 0) {
+            container.innerHTML = '<div class="no-data-message">暂无每日快报数据</div>';
+            return;
+        }
+        
+        // 按日期分组文章
+        const groupedArticles = groupArticlesByDate(articles);
+        
+        // 渲染每个日期组的文章
+        Object.keys(groupedArticles).sort().reverse().forEach(dateStr => {
+            const articlesForDate = groupedArticles[dateStr];
+            
+            // 创建日期组容器
+            const dateGroup = document.createElement('div');
+            dateGroup.className = 'date-group hotnews-group';
+            dateGroup.dataset.date = dateStr;
+            
+            // 创建日期标题
+            const dateHeader = document.createElement('div');
+            dateHeader.className = 'date-header hotnews-group-header';
+            dateHeader.innerHTML = `
+                <span class="date-label"><i class="fas fa-calendar-day"></i> ${dateStr}</span>
+                <span class="article-count">${articlesForDate.length} 篇报告</span>
+            `;
+            dateGroup.appendChild(dateHeader);
+            
+            // 创建文章容器
+            const articlesContainer = document.createElement('div');
+            articlesContainer.className = 'articles-container';
+            
+            // 添加每篇文章
+            articlesForDate.forEach(article => {
+                const card = createHotNewsCard(article);
+                articlesContainer.appendChild(card);
+            });
+            
+            dateGroup.appendChild(articlesContainer);
+            container.appendChild(dateGroup);
+        });
     }
 
     // --- 文章分页渲染 ---
@@ -544,8 +657,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             // 调用实际的渲染函数
                             if (sourceKey === 'x') {
                                 renderXArticles(cachedData.data, sourceKey);
-                            } else {
+                            } else if (sourceKey === 'crunchbase') {
                                 renderCrunchbaseArticles(cachedData.data, sourceKey);
+                            } else if (sourceKey === 'hotnews') {
+                                renderHotNewsArticles(cachedData.data, sourceKey);
                             }
                             
                             // 渲染文章分页
@@ -560,8 +675,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             // 调用实际的渲染函数
                             if (sourceKey === 'x') {
                                 renderXArticles(cachedData.data, sourceKey);
-                            } else {
+                            } else if (sourceKey === 'crunchbase') {
                                 renderCrunchbaseArticles(cachedData.data, sourceKey);
+                            } else if (sourceKey === 'hotnews') {
+                                renderHotNewsArticles(cachedData.data, sourceKey);
                             }
 
                             // 渲染文章分页
@@ -645,8 +762,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 调用实际的渲染函数
                         if (sourceKey === 'x') {
                             renderXArticles(data.data, sourceKey);
-                        } else {
+                        } else if (sourceKey === 'crunchbase') {
                             renderCrunchbaseArticles(data.data, sourceKey);
+                        } else if (sourceKey === 'hotnews') {
+                            renderHotNewsArticles(data.data, sourceKey);
                         }
                         
                         // 渲染文章分页
@@ -660,8 +779,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 调用实际的渲染函数
                         if (sourceKey === 'x') {
                             renderXArticles(data.data, sourceKey);
-                        } else {
+                        } else if (sourceKey === 'crunchbase') {
                             renderCrunchbaseArticles(data.data, sourceKey);
+                        } else if (sourceKey === 'hotnews') {
+                            renderHotNewsArticles(data.data, sourceKey);
                         }
 
                         // 渲染文章分页
@@ -706,6 +827,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (xLogo) {
                 xLogo.src = '/static/images/X_logo_light.png';
             }
+            
+            // 设置HotNews图标颜色为非活动状态
+            const hotnewsIcon = link.querySelector('.hotnews-icon');
+            if (hotnewsIcon) {
+                hotnewsIcon.style.color = '#ff6b00'; // 保持原色
+            }
         });
         
         // 显示当前标签内容
@@ -721,6 +848,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (xLogo) {
                 xLogo.src = '/static/images/X_logo_dark.png';
             }
+            
+            // 设置HotNews图标颜色为活动状态
+            const hotnewsIcon = event.currentTarget.querySelector('.hotnews-icon');
+            if (hotnewsIcon) {
+                hotnewsIcon.style.color = '#ffffff'; // 活动状态为白色
+            }
         } else {
             // 初始化调用时没有事件对象
             const linkForContent = document.querySelector(`[onclick*="${contentId}"]`);
@@ -731,6 +864,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const xLogo = linkForContent.querySelector('.x-logo');
                 if (xLogo) {
                     xLogo.src = '/static/images/X_logo_dark.png';
+                }
+                
+                // 设置HotNews图标颜色为活动状态
+                const hotnewsIcon = linkForContent.querySelector('.hotnews-icon');
+                if (hotnewsIcon) {
+                    hotnewsIcon.style.color = '#ffffff'; // 活动状态为白色
                 }
             }
         }
@@ -878,6 +1017,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         cbStore.createIndex('timestamp', 'timestamp', { unique: false });
                     }
                     
+                    if (!db.objectStoreNames.contains('hotnewsArticles')) {
+                        const hotnewsStore = db.createObjectStore('hotnewsArticles', { keyPath: 'cacheKey' });
+                        hotnewsStore.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                    
                     console.log('数据库架构初始化完成');
                 };
                 
@@ -914,7 +1058,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 获取存储对象名称
         _getStoreName(sourceKey) {
-            return sourceKey === 'x' ? 'xArticles' : 'crunchbaseArticles';
+            if (sourceKey === 'x') return 'xArticles';
+            if (sourceKey === 'crunchbase') return 'crunchbaseArticles';
+            if (sourceKey === 'hotnews') return 'hotnewsArticles';
+            return 'xArticles'; // 默认返回
         }
         
         // 从缓存获取数据
@@ -1023,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         async _cleanupExpiredCache() {
             if (!this.isInitialized) return;
             
-            const storeNames = ['xArticles', 'crunchbaseArticles'];
+            const storeNames = ['xArticles', 'crunchbaseArticles', 'hotnewsArticles'];
             const now = Date.now();
             
             for (const storeName of storeNames) {
@@ -1069,7 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         async clearAllCache() {
             if (!this.isInitialized) return;
             
-            const storeNames = ['xArticles', 'crunchbaseArticles'];
+            const storeNames = ['xArticles', 'crunchbaseArticles', 'hotnewsArticles'];
             
             for (const storeName of storeNames) {
                 try {
