@@ -69,4 +69,5 @@ python3 main.py clean
 
 ## 部署
 
-项目使用 Vercel 进行部署，基于 Python 运行时。前端静态文件位于 `static` 目录。 
+项目使用 Vercel 进行部署，基于 Python 运行时。前端静态文件位于 `static` 目录。 # 触发自动部署
+Thu Apr 10 19:00:14 CST 2025
